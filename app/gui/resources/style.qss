@@ -1,0 +1,17 @@
+QWidget { font-size: 13px; }
+QListWidget#nav { background: #1f2933; color: #e4e7eb; border: none; padding-top: 8px; outline: 0; }
+QListWidget#nav::item { padding: 10px 16px; }
+QListWidget#nav::item:selected { background: #2f6feb; color: white; }
+QLabel#pageTitle { font-size: 22px; font-weight: 600; }
+QLabel#pageHint { color: #52606d; }
+QLabel#summary { padding: 8px 0 14px 0; color: #323f4b; }
+QPushButton { padding: 6px 14px; border: 1px solid #9aa5b1; border-radius: 4px; background: #f5f7fa; color: #1f2933; }
+QPushButton:hover { background: #e4e7eb; }
+QPushButton#primary { background: #2f6feb; color: white; border-color: #2f6feb; font-weight: 600; }
+QPushButton#primary:hover { background: #1f5bd0; }
+QPushButton#tile { text-align: left; padding: 18px; min-height: 64px; background: white; }
+QPushButton:disabled { color: #9aa5b1; }
+QPlainTextEdit[state="error"] { border: 1px solid #b3261e; background: #fff6f5; color: #7a1b15; }
+QPlainTextEdit[state="ok"] { border: 1px solid #7bb68b; background: #f6fbf7; color: #1f2933; }
+QGroupBox { font-weight: 600; margin-top: 10px; }
+QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; }

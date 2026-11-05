@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "atica"
+version = "0.8.0"
+description = "Manufacturing units, packaging and quantity conversion library."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+authors = [{ name = "ATICA contributors" }]
+keywords = ["manufacturing", "unit conversion", "packaging", "inventory", "decimal"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Manufacturing",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+]
+# The core library has NO mandatory dependencies.
+dependencies = []
+
+[project.optional-dependencies]
+excel = ["openpyxl>=3.0"]
+gui = ["PySide6>=6.5"]
+dev = ["pytest>=7", "openpyxl>=3.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/atica"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/atica", "tests", "docs", "README.md", "LICENSE", "CHANGELOG.md", "CONTRIBUTING.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
