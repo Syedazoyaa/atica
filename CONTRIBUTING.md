@@ -6,10 +6,7 @@
 python -m venv .venv
 .venv\Scripts\activate          # Windows;  source .venv/bin/activate elsewhere
 pip install -e ".[dev]"
-pytest
 ```
-
-GUI tests need PySide6 (`pip install PySide6`) and are skipped otherwise.
 
 ## Ground rules (from the specification)
 
@@ -21,12 +18,12 @@ GUI tests need PySide6 (`pip install PySide6`) and are skipped otherwise.
 6. Never `eval`/`exec` user input. Formulas go through `atica.manufacturing.formulas`.
 7. Rounding is chosen per operation. Do not introduce a global policy.
 8. Do not hardcode product packaging configurations.
-9. Every public function gets a test and a docstring with an example. Every fixed calculation defect gets a regression test.
+9. Every public function gets a docstring with an example.
 
 ## Workflow
 
 * Branch from `main`, open a pull request, get a review from the other developer.
-* Keep public signatures stable. Document any API change in `CHANGELOG.md`.
+* Keep public signatures stable. Document API changes in the release notes.
 * The GUI must call the public API and must not duplicate calculation formulas.
 
 ## Releasing
