@@ -7,11 +7,17 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QFileDialog,
+    QFrame,
     QHBoxLayout,
+    QLabel,
+    QLayout,
     QListWidget,
+    QListWidgetItem,
     QMainWindow,
     QMessageBox,
+    QStyle,
     QStackedWidget,
+    QVBoxLayout,
     QWidget,
 )
 
@@ -36,6 +42,7 @@ class MainWindow(QMainWindow):
         self.state = state
         self.setWindowTitle("ATICA Desktop")
         self.resize(1100, 760)
+        self.setMinimumSize(900, 600)
 
         pages = [
             ("Standard Unit Converter", "Convert physical units", UnitConverterPage(state)),
@@ -50,30 +57,102 @@ class MainWindow(QMainWindow):
         ]
         self.nav = QListWidget()
         self.nav.setObjectName("nav")
-        self.nav.setFixedWidth(250)
+        self.nav.setFixedWidth(248)
         self.nav.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.nav.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.nav.setSpacing(2)
         self.stack = QStackedWidget()
         dashboard = DashboardPage(state, [(i + 1, name, blurb) for i, (name, blurb, _p) in enumerate(pages)])
         dashboard.navigate.connect(self.nav.setCurrentRow)
-        self.nav.addItem("Dashboard")
+        self._add_nav_item("Dashboard", QStyle.SP_ComputerIcon)
         self.stack.addWidget(dashboard)
-        for name, _blurb, page in pages:
-            self.nav.addItem(name)
+        icons = (
+            QStyle.SP_DialogApplyButton,
+            QStyle.SP_FileDialogDetailedView,
+            QStyle.SP_DirOpenIcon,
+            QStyle.SP_ArrowRight,
+            QStyle.SP_ComputerIcon,
+            QStyle.SP_DialogCancelButton,
+            QStyle.SP_DriveHDIcon,
+            QStyle.SP_DialogOpenButton,
+            QStyle.SP_MessageBoxInformation,
+        )
+        for (name, _blurb, page), icon in zip(pages, icons):
+            self._add_nav_item(name, icon)
             self.stack.addWidget(page)
         self.nav.currentRowChanged.connect(self.stack.setCurrentIndex)
         self.nav.setCurrentRow(0)
 
         central = QWidget()
+        central.setObjectName("appSurface")
         lay = QHBoxLayout(central)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
-        lay.addWidget(self.nav)
-        lay.addWidget(self.stack, 1)
+        lay.addWidget(self._sidebar())
+        workspace = QWidget()
+        workspace.setObjectName("workspace")
+        workspace_lay = QVBoxLayout(workspace)
+        workspace_lay.setContentsMargins(0, 0, 0, 0)
+        workspace_lay.setSpacing(0)
+        workspace_lay.addWidget(self._workspace_header())
+        workspace_lay.addWidget(self.stack, 1)
+        lay.addWidget(workspace, 1)
         self.setCentralWidget(central)
         self._menu()
         state.changed.connect(self._update_title)
         self._update_title()
         self.statusBar().showMessage("ATICA library %s — all calculations run offline." % __version__)
+
+    def _add_nav_item(self, label: str, icon: QStyle.StandardPixmap) -> None:
+        item = QListWidgetItem(self.style().standardIcon(icon), label)
+        item.setToolTip(label)
+        self.nav.addItem(item)
+
+    def _sidebar(self) -> QWidget:
+        sidebar = QWidget()
+        sidebar.setObjectName("sidebar")
+        sidebar.setFixedWidth(248)
+        layout = QVBoxLayout(sidebar)
+        layout.setContentsMargins(16, 20, 16, 14)
+        layout.setSpacing(0)
+
+        brand = QLabel("ATICA")
+        brand.setObjectName("brand")
+        tagline = QLabel("Manufacturing intelligence")
+        tagline.setObjectName("tagline")
+        layout.addWidget(brand)
+        layout.addWidget(tagline)
+        layout.addSpacing(22)
+        layout.addWidget(self.nav, 1)
+
+        divider = QFrame()
+        divider.setObjectName("sidebarDivider")
+        divider.setFrameShape(QFrame.HLine)
+        layout.addWidget(divider)
+        version = QLabel("ATICA Desktop %s" % __version__)
+        version.setObjectName("sidebarVersion")
+        info = QLabel("Offline workspace  •  File settings in File menu")
+        info.setObjectName("sidebarInfo")
+        info.setWordWrap(True)
+        layout.addWidget(version)
+        layout.addWidget(info)
+        return sidebar
+
+    def _workspace_header(self) -> QWidget:
+        header = QWidget()
+        header.setObjectName("workspaceHeader")
+        layout = QHBoxLayout(header)
+        layout.setContentsMargins(26, 20, 26, 14)
+        layout.setSpacing(6)
+        title = QLabel("Operations workspace")
+        title.setObjectName("workspaceTitle")
+        detail = QLabel("Select a module from the navigation to get started.")
+        detail.setObjectName("workspaceDetail")
+        layout.addWidget(title)
+        layout.addWidget(detail)
+        layout.addStretch(1)
+        layout.setSizeConstraint(QLayout.SetDefaultConstraint)
+        return header
 
     # ------------------------------------------------------------------- menu
     def _menu(self) -> None:

@@ -10,7 +10,7 @@ import logging
 from typing import Callable, Iterable, Optional
 
 from PySide6.QtGui import QFontDatabase
-from PySide6.QtWidgets import QComboBox, QPlainTextEdit
+from PySide6.QtWidgets import QComboBox, QFrame, QLabel, QPlainTextEdit, QVBoxLayout
 
 from atica.exceptions import AticaError
 from atica.results import CalculationResult
@@ -69,6 +69,26 @@ class ResultBox(QPlainTextEdit):
         for w in result.warnings:
             lines.append("WARNING [%s] %s" % (w.code, w.message))
         (self.show_error if result.errors else self.show_text)("\n".join(lines))
+
+
+class KpiCard(QFrame):
+    """Compact live metric surface used by the dashboard."""
+
+    def __init__(self, label: str, value: str = "0") -> None:
+        super().__init__()
+        self.setObjectName("kpiCard")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setSpacing(3)
+        self.value = QLabel(value)
+        self.value.setObjectName("kpiValue")
+        caption = QLabel(label.upper())
+        caption.setObjectName("kpiLabel")
+        layout.addWidget(self.value)
+        layout.addWidget(caption)
+
+    def set_value(self, value: str) -> None:
+        self.value.setText(value)
 
 
 def format_calc(result: CalculationResult, extra: Optional[Iterable[str]] = None) -> str:

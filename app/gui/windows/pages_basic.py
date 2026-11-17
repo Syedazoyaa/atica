@@ -28,7 +28,7 @@ from atica import __version__
 from atica.packaging import PackagingLevel, Product, breakdown
 from atica.units import BASE_UNITS
 
-from widgets.common import ResultBox, fill_combo, format_calc, guarded, rounding_combo
+from widgets.common import KpiCard, ResultBox, fill_combo, format_calc, guarded, rounding_combo
 from .state import AppState
 
 
@@ -37,6 +37,7 @@ class Page(QWidget):
 
     def __init__(self, state: AppState) -> None:
         super().__init__()
+        self.setObjectName("page")
         self.state = state
         state.changed.connect(self.refresh)
 
@@ -46,6 +47,7 @@ class Page(QWidget):
     @staticmethod
     def title(text: str, hint: str = "") -> QWidget:
         box = QWidget()
+        box.setObjectName("pageHeader")
         lay = QVBoxLayout(box)
         lay.setContentsMargins(0, 0, 0, 6)
         head = QLabel(text)
@@ -71,26 +73,59 @@ class DashboardPage(Page):
     def __init__(self, state: AppState, entries: List[tuple]) -> None:
         super().__init__(state)
         lay = QVBoxLayout(self)
-        lay.addWidget(self.title("ATICA", "Manufacturing units, packaging and quantity conversion. Version %s." % __version__))
+        lay.setContentsMargins(28, 24, 28, 28)
+        lay.setSpacing(18)
+        lay.addWidget(self.title("Workspace overview", "A live view of your configuration and the tools used to manage it."))
+
+        metrics = QHBoxLayout()
+        metrics.setSpacing(10)
+        self.unit_kpi = KpiCard("Custom units")
+        self.product_kpi = KpiCard("Products")
+        self.material_kpi = KpiCard("Materials")
+        self.rule_kpi = KpiCard("Purchasing rules")
+        for card in (self.unit_kpi, self.product_kpi, self.material_kpi, self.rule_kpi):
+            metrics.addWidget(card, 1)
+        lay.addLayout(metrics)
+
         self.summary = QLabel()
         self.summary.setObjectName("summary")
         lay.addWidget(self.summary)
-        grid = QGridLayout()
-        for i, (index, name, blurb) in enumerate(entries):
-            btn = QPushButton("%s\n%s" % (name, blurb))
-            btn.setObjectName("tile")
-            btn.clicked.connect(lambda _=False, idx=index: self.navigate.emit(idx))
-            grid.addWidget(btn, i // 3, i % 3)
-        lay.addLayout(grid)
+
+        groups = (
+            ("Model & configure", entries[:3]),
+            ("Calculate & operate", entries[3:7]),
+            ("Import & govern", entries[7:]),
+        )
+        for group_name, group_entries in groups:
+            group = QGroupBox(group_name)
+            grid = QGridLayout(group)
+            grid.setContentsMargins(12, 22, 12, 12)
+            grid.setHorizontalSpacing(10)
+            grid.setVerticalSpacing(10)
+            for i, (index, name, blurb) in enumerate(group_entries):
+                btn = QPushButton("%s\n%s" % (name, blurb))
+                btn.setObjectName("shortcut")
+                btn.setToolTip(blurb)
+                btn.clicked.connect(lambda _=False, idx=index: self.navigate.emit(idx))
+                grid.addWidget(btn, i // 2, i % 2)
+            lay.addWidget(group)
         lay.addStretch(1)
         self.refresh()
 
     def refresh(self) -> None:
         cfg = self.state.config
         where = self.state.path or "not saved to a file yet (auto-saved on exit)"
+        custom_units = len(cfg.registry.list_custom_units())
+        products = len(cfg.products)
+        materials = len(cfg.materials)
+        purchasing = len(cfg.purchasing)
+        self.unit_kpi.set_value(str(custom_units))
+        self.product_kpi.set_value(str(products))
+        self.material_kpi.set_value(str(materials))
+        self.rule_kpi.set_value(str(purchasing))
         self.summary.setText(
             "%d custom unit(s)  ·  %d product(s)  ·  %d material(s)  ·  %d purchasing rule(s)\nConfiguration: %s"
-            % (len(cfg.registry.list_custom_units()), len(cfg.products), len(cfg.materials), len(cfg.purchasing), where)
+            % (custom_units, products, materials, purchasing, where)
         )
 
 
