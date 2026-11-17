@@ -33,7 +33,3 @@ pyside6-deploy app/gui/main.py          # or: pip install pyinstaller && pyinsta
 
 Smoke-test the produced executable on a clean machine before publishing. An installer (for example Inno Setup) can wrap the
 output folder.
-
-## Tests
-
-`tests/test_gui_smoke.py` drives every page headlessly (`QT_QPA_PLATFORM=offscreen`) and is skipped when PySide6 is absent.

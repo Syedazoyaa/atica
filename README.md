@@ -99,7 +99,6 @@ See [docs/desktop_app.md](docs/desktop_app.md), including Windows packaging.
 
 ```bash
 pip install -e ".[dev]"
-pytest
 ```
 
 Documentation lives in [docs/](docs/): [getting started](docs/getting_started.md), [architecture](docs/architecture.md),
