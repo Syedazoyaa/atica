@@ -1,345 +1,427 @@
-"""The unit registry: unit lookup, compatibility and conversion."""
+"""The unit registry: lookup, compatibility, conversion and custom units."""
+
 from __future__ import annotations
 
-import json
-import os
+import dataclasses
+import difflib
+import threading
 from decimal import Decimal
-from typing import Any, Dict, Iterable, List, Optional
+from fractions import Fraction
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
-from ..calculations.numeric import calc_context, clean, format_quantity, to_decimal
-from ..calculations.rounding import RoundingPolicy, round_value
-from ..exceptions import (
-    ConfigurationError,
+from ..core.exceptions import (
     IncompatibleUnitError,
-    InvalidConversionError,
+    InvalidQuantityError,
+    UnitDefinitionError,
     UnknownUnitError,
+    UnsupportedOperationError,
+    ValidationError,
 )
-from ..results import CalculationResult
-from .categories import BASE_UNITS
-from .custom_units import (
-    CustomUnitDefinition,
-    parse_factor,
-    resolve_custom_units,
-    validate_identifier,
-)
-from .definitions import Unit, build_standard_units
+from ..core.precision import display_decimal, fraction_to_decimal, to_fraction
+from ..core.results import Result
+from ..core.rounding import Rounding, resolve_rounding, round_fraction
+from .definitions import BASE_UNITS, Unit, standard_units
 
-SCHEMA_VERSION = 1
-
-# conversion strategies: (to_base, from_base)
-def _to_base(value: Decimal, unit: Unit) -> Decimal:
-    return (value + unit.offset) * unit.factor
+_STANDARD: Tuple[Unit, ...] = standard_units()
+_MAX_NAME = 64
+_REGISTRY_FORMAT = "atica.unit_registry"
+_REGISTRY_VERSION = 1
 
 
-def _from_base(base: Decimal, unit: Unit) -> Decimal:
-    return base / unit.factor - unit.offset
+@dataclasses.dataclass(frozen=True)
+class Conversion(Result):
+    """Result of :func:`~atica.units.convert`.
 
+    ``value`` is in ``unit``; ``exact_value`` is the same before any requested rounding.
+    ``str(conversion)`` is ``"2500 g"``.
+    """
 
-_STRATEGIES = {
-    "linear": (_to_base, _from_base),
-    "offset": (_to_base, _from_base),
-}
+    value: Decimal
+    unit: str
+    source_value: Decimal
+    source_unit: str
+    category: str
+    exact_value: Decimal
+    rounding: Rounding = Rounding.NONE
+    places: int = 0
+    formula: str = ""
+    warnings: Tuple[str, ...] = ()
+
+    def __str__(self) -> str:
+        return "%s %s" % (display_decimal(self.value), self.unit)
 
 
 class UnitRegistry:
-    """Holds standard and custom units. Registries are fully independent."""
+    """A set of units. Registries are independent of one another.
 
-    def __init__(self, *, load_standard: bool = True) -> None:
-        self._standard: Dict[str, Unit] = {}
-        self._aliases: Dict[str, str] = {}
-        self._definitions: Dict[str, CustomUnitDefinition] = {}
-        self._custom: Dict[str, Unit] = {}
-        if load_standard:
-            for unit in build_standard_units():
-                self._add_standard(unit)
+    ``UnitRegistry()`` contains every standard unit and may be extended with
+    :meth:`register_unit`; a *frozen* registry (such as the shared default one) rejects changes.
+    """
+
+    def __init__(self, *, include_standard: bool = True) -> None:
+        self._units: Dict[str, Unit] = {}  # canonical symbol -> unit (insertion ordered)
+        self._lookup: Dict[str, Unit] = {}  # any accepted spelling -> unit
+        self._bases: Dict[str, str] = {}  # category -> base unit symbol
+        self._frozen = False
+        self._lock = threading.RLock()
+        if include_standard:
+            self._bases.update(BASE_UNITS)
+            for unit in _STANDARD:
+                self._add(unit)
+
+    # --------------------------------------------------------------- internals
+    def _add(self, unit: Unit) -> None:
+        for key in (unit.symbol, *unit.aliases):
+            self._lookup[key] = unit
+        self._units[unit.symbol] = unit
+
+    def _check_mutable(self) -> None:
+        if self._frozen:
+            raise UnsupportedOperationError(
+                "This registry is read-only (it is the shared default registry).",
+                hint="Create your own with UnitRegistry() (or default_registry().copy()) and register units there.",
+            )
+
+    @property
+    def frozen(self) -> bool:
+        """True when the registry cannot be modified."""
+        return self._frozen
+
+    def freeze(self) -> UnitRegistry:
+        """Make this registry read-only (irreversible; use :meth:`copy` for a writable one)."""
+        self._frozen = True
+        return self
 
     # ------------------------------------------------------------------ lookup
-    def _add_standard(self, unit: Unit) -> None:
-        for key in (unit.unit_id,) + unit.aliases:
-            if key in self._aliases:
-                raise InvalidConversionError(
-                    "Duplicate unit identifier %r in standard definitions." % key,
-                    code="DUPLICATE_UNIT",
-                )
-            self._aliases[key] = unit.unit_id
-        self._standard[unit.unit_id] = unit
+    def get(self, name: str) -> Unit:
+        """Return the unit called ``name`` (symbol or alias, case-sensitive)."""
+        if isinstance(name, str):
+            found = self._lookup.get(name.strip())
+            if found is not None:
+                return found
+        shown = repr(name)
+        hint = "Unit names are case-sensitive."
+        if isinstance(name, str):
+            close = difflib.get_close_matches(name.strip(), list(self._lookup), n=3, cutoff=0.6)
+            if close:
+                hint = "Did you mean: %s?" % ", ".join(close)
+        else:
+            hint = "Unit names must be strings."
+        raise UnknownUnitError("Unknown unit %s." % shown, parameter="unit", hint=hint)
 
-    def _lookup(self, name: str) -> Optional[Unit]:
-        if not isinstance(name, str):
-            return None
-        name = name.strip()
-        if name in self._custom:
-            return self._custom[name]
-        std_id = self._aliases.get(name)
-        return self._standard.get(std_id) if std_id else None
+    def __contains__(self, name: object) -> bool:
+        return isinstance(name, str) and name.strip() in self._lookup
 
-    def _lookup_standard(self, name: str) -> Optional[Unit]:
-        std_id = self._aliases.get(name.strip()) if isinstance(name, str) else None
-        return self._standard.get(std_id) if std_id else None
-
-    def get(self, unit: str) -> Unit:
-        found = self._lookup(unit)
-        if found is None:
-            raise UnknownUnitError("Unknown unit %r." % (unit,), field="unit")
-        return found
-
-    def has_unit(self, unit: str) -> bool:
-        return self._lookup(unit) is not None
-
-    __contains__ = has_unit
-
-    def list_units(self, category: Optional[str] = None, *, include_custom: bool = True) -> List[Unit]:
-        units: List[Unit] = list(self._standard.values())
-        if include_custom:
-            units += list(self._custom.values())
+    def units(self, category: Optional[str] = None) -> Tuple[Unit, ...]:
+        """All units, optionally only those of one ``category``."""
         if category is not None:
-            if category not in BASE_UNITS:
-                raise UnknownUnitError("Unknown category %r." % (category,), field="category")
-            units = [u for u in units if u.category == category]
-        return units
+            self.base_unit(category)  # validates the category
+            return tuple(u for u in self._units.values() if u.category == category)
+        return tuple(self._units.values())
 
-    def categories(self) -> List[str]:
-        return list(BASE_UNITS)
+    def categories(self) -> Tuple[str, ...]:
+        """Names of all measurement categories."""
+        return tuple(self._bases)
 
     def base_unit(self, category: str) -> str:
+        """Symbol of the base unit of ``category``."""
         try:
-            return BASE_UNITS[category]
+            return self._bases[category]
         except KeyError:
-            raise UnknownUnitError("Unknown category %r." % (category,), field="category") from None
+            raise UnknownUnitError(
+                "Unknown category %r." % (category,),
+                parameter="category",
+                hint="Available: %s." % ", ".join(self._bases),
+            ) from None
 
     def are_compatible(self, unit_a: str, unit_b: str) -> bool:
+        """True when both units measure the same kind of quantity."""
         return self.get(unit_a).category == self.get(unit_b).category
 
     # -------------------------------------------------------------- conversion
+    def _pair(self, from_unit: str, to_unit: str) -> Tuple[Unit, Unit]:
+        src, dst = self.get(from_unit), self.get(to_unit)
+        if src.category != dst.category:
+            same = [u.symbol for u in self.units(src.category)][:6]
+            raise IncompatibleUnitError(
+                "Cannot convert %s (%s) to %s (%s): they measure different things."
+                % (src.symbol, src.category, dst.symbol, dst.category),
+                parameter="to_unit",
+                hint="Units compatible with %s include: %s." % (src.symbol, ", ".join(same)),
+            )
+        return src, dst
+
+    def factor(self, from_unit: str, to_unit: str) -> Fraction:
+        """Exact multiplier ``m`` with ``value_in_to_unit = value_in_from_unit * m``.
+
+        Only defined for ordinary (non-offset) units; raises
+        :class:`~atica.core.exceptions.UnsupportedOperationError` for Celsius/Fahrenheit.
+        """
+        src, dst = self._pair(from_unit, to_unit)
+        if src.is_offset or dst.is_offset:
+            raise UnsupportedOperationError(
+                "%s -> %s has an offset and cannot be expressed as one multiplier."
+                % (src.symbol, dst.symbol),
+                parameter="from_unit",
+                hint="Use convert() for absolute temperatures, or convert(..., interval=True) for differences.",
+            )
+        return src.factor / dst.factor
+
     def convert(
         self,
         value: Any,
         from_unit: str,
         to_unit: str,
         *,
-        precision: Optional[int] = None,
-        rounding: Any = None,
-    ) -> CalculationResult:
-        """Convert ``value`` between compatible units.
-
-        ``precision`` (decimal places) and ``rounding`` control *output* rounding;
-        without them the result keeps full calculation precision. The unrounded
-        value is always available as ``result.metadata['exact_quantity']``.
-        """
-        src = self.get(from_unit)
-        dst = self.get(to_unit)
-        amount = to_decimal(value, field="value")
-        if src.category != dst.category:
-            raise IncompatibleUnitError(
-                "Cannot convert %s (%s) to %s (%s)." % (src.unit_id, src.category, dst.unit_id, dst.category),
-                field="to_unit",
-            )
-        to_base, _ = _STRATEGIES[src.conversion_strategy]
-        _, from_base = _STRATEGIES[dst.conversion_strategy]
-        with calc_context():
-            base = to_base(amount, src)
-            if src.category == "temperature" and base < 0:
-                raise InvalidConversionError(
-                    "%s %s is below absolute zero." % (format_quantity(amount), src.unit_id),
-                    code="BELOW_ABSOLUTE_ZERO",
-                    field="value",
+        rounding: Any = Rounding.NONE,
+        places: int = 0,
+        interval: bool = False,
+    ) -> Conversion:
+        """Convert ``value`` from ``from_unit`` to ``to_unit`` (see :func:`atica.units.convert`)."""
+        src, dst = self._pair(from_unit, to_unit)
+        policy, places = resolve_rounding(rounding, places)
+        amount = to_fraction(value, "value")
+        if interval:
+            if src.category != "temperature":
+                raise UnsupportedOperationError(
+                    "interval=True only applies to temperature units.", parameter="interval"
                 )
-            exact = clean(from_base(base, dst))
-        policy = RoundingPolicy.parse(rounding)
-        if precision is not None and policy is RoundingPolicy.NONE:
-            policy = RoundingPolicy.HALF_UP
-        out = round_value(exact, policy, places=precision or 0) if precision is not None else exact
-        if src.conversion_strategy == "linear" and dst.conversion_strategy == "linear":
-            with calc_context():
-                ratio = clean(src.factor / dst.factor)
-            formula = "value x %s" % format_quantity(ratio)
+            result = amount * src.factor / dst.factor
+            formula = "difference x %s" % _show(src.factor / dst.factor)
         else:
-            formula = "(value + %s) x %s -> base; base / %s - %s" % (
-                format_quantity(src.offset),
-                format_quantity(src.factor),
-                format_quantity(dst.factor),
-                format_quantity(dst.offset),
-            )
-        warnings = ()
-        if not (src.exact and dst.exact):
-            warnings = ("Conversion uses an approximate factor.",)
-        return CalculationResult(
-            output_quantity=out,
-            output_unit=dst.unit_id,
-            input_quantity=amount,
-            input_unit=src.unit_id,
+            base = (amount + src.offset) * src.factor
+            if src.category == "temperature" and base < 0:
+                raise InvalidQuantityError(
+                    "%s %s is below absolute zero." % (_show(amount), src.symbol),
+                    parameter="value",
+                    hint="Temperatures cannot be below absolute zero (0 K).",
+                )
+            result = base / dst.factor - dst.offset
+            if src.is_offset or dst.is_offset:
+                formula = "((value + %s) x %s) / %s - %s" % (
+                    _show(src.offset),
+                    _show(src.factor),
+                    _show(dst.factor),
+                    _show(dst.offset),
+                )
+            else:
+                formula = "value x %s" % _show(src.factor / dst.factor)
+        exact = fraction_to_decimal(result)
+        rounded = round_fraction(result, policy, places)
+        return Conversion(
+            value=rounded if policy is not Rounding.NONE else _norm(exact),
+            unit=dst.symbol,
+            source_value=_norm(fraction_to_decimal(amount)),
+            source_unit=src.symbol,
+            category=src.category,
+            exact_value=_norm(exact),
+            rounding=policy,
+            places=places,
             formula=formula,
-            rounding_policy=policy if precision is not None else RoundingPolicy.NONE,
-            warnings=warnings,
-            metadata={"category": src.category, "exact_quantity": exact},
         )
 
     # ------------------------------------------------------------ custom units
-    def _commit(self, definitions: Dict[str, CustomUnitDefinition]) -> None:
-        resolved = resolve_custom_units(definitions, self._lookup_standard)
-        self._definitions = definitions
-        self._custom = resolved
+    def _validate_new_name(self, name: str, what: str = "unit") -> str:
+        if not isinstance(name, str) or not name.strip():
+            raise UnitDefinitionError("A %s name must be a non-empty string." % what, parameter="name")
+        name = name.strip()
+        if len(name) > _MAX_NAME or not name.isprintable():
+            raise UnitDefinitionError(
+                "%r is not a valid %s name (max %d printable characters)." % (name, what, _MAX_NAME),
+                parameter="name",
+            )
+        if name in self._lookup:
+            raise UnitDefinitionError(
+                "The name %r is already used by unit %r." % (name, self._lookup[name].symbol),
+                parameter="name",
+                hint="Choose a different name; existing units cannot be redefined.",
+            )
+        return name
 
     def register_unit(
         self,
         name: str,
-        category: str,
-        reference_unit: str,
         factor: Any,
+        reference_unit: str,
         *,
-        symbol: Optional[str] = None,
+        aliases: Iterable[str] = (),
         display_name: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
     ) -> Unit:
-        """Register ``1 <name> = <factor> <reference_unit>``."""
-        name = validate_identifier(name)
-        if self._lookup(name) is not None or name in self._aliases:
-            raise InvalidConversionError(
-                "Unit identifier %r already exists." % name, code="DUPLICATE_UNIT", field="name"
-            )
-        if category not in BASE_UNITS:
-            raise UnknownUnitError("Unknown category %r." % (category,), field="category")
-        if not isinstance(reference_unit, str) or self._lookup(reference_unit) is None:
-            raise UnknownUnitError("Unknown reference unit %r." % (reference_unit,), field="reference_unit")
-        ref = self._lookup(reference_unit)
-        defs = dict(self._definitions)
-        defs[name] = CustomUnitDefinition(
-            name=name,
-            category=category,
-            reference_unit=ref.unit_id,
-            factor=parse_factor(factor),
-            symbol=symbol,
-            display_name=display_name,
-            metadata=dict(metadata or {}),
-        )
-        self._commit(defs)
-        return self._custom[name]
+        """Define ``1 <name> = <factor> <reference_unit>``.
 
-    def get_custom_unit(self, name: str) -> Unit:
-        if name not in self._custom:
-            raise UnknownUnitError("Unknown custom unit %r." % (name,), field="name")
-        return self._custom[name]
+        >>> reg = UnitRegistry()
+        >>> _ = reg.register_unit("bag", 25, "kg")
+        >>> str(reg.convert(4, "bag", "kg"))
+        '100 kg'
 
-    def list_custom_units(self) -> List[Unit]:
-        return list(self._custom.values())
-
-    def update_unit(
-        self,
-        name: str,
-        *,
-        category: Optional[str] = None,
-        reference_unit: Optional[str] = None,
-        factor: Any = None,
-        symbol: Optional[str] = None,
-        display_name: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Unit:
-        """Change a custom definition. The registry is untouched if validation fails."""
-        if name not in self._definitions:
-            raise UnknownUnitError("Unknown custom unit %r." % (name,), field="name")
-        old = self._definitions[name]
-        ref_name = old.reference_unit
-        if reference_unit is not None:
-            found = self._lookup(reference_unit)
-            if found is None:
-                raise UnknownUnitError("Unknown reference unit %r." % (reference_unit,), field="reference_unit")
-            ref_name = found.unit_id
-        new = CustomUnitDefinition(
-            name=name,
-            category=category or old.category,
-            reference_unit=ref_name,
-            factor=parse_factor(factor) if factor is not None else old.factor,
-            symbol=symbol if symbol is not None else old.symbol,
-            display_name=display_name if display_name is not None else old.display_name,
-            metadata=dict(metadata) if metadata is not None else dict(old.metadata),
-        )
-        defs = dict(self._definitions)
-        defs[name] = new
-        self._commit(defs)
-        return self._custom[name]
-
-    def remove_unit(self, name: str) -> None:
-        if name not in self._definitions:
-            if self._lookup(name) is not None:
-                raise InvalidConversionError(
-                    "%r is a standard unit and cannot be removed." % name, code="STANDARD_UNIT", field="name"
+        The new unit belongs to the reference unit's category.  Offset scales
+        (Celsius, Fahrenheit) cannot be used as a reference.  Existing names can
+        never be redefined, which also makes circular definitions impossible.
+        """
+        with self._lock:
+            self._check_mutable()
+            name = self._validate_new_name(name)
+            ref = self.get(reference_unit)
+            if ref.is_offset:
+                raise UnitDefinitionError(
+                    "%s is an offset scale and cannot be the reference of a custom unit." % ref.symbol,
+                    parameter="reference_unit",
+                    hint="Use the absolute scale (K) as reference instead.",
                 )
-            raise UnknownUnitError("Unknown custom unit %r." % (name,), field="name")
-        dependents = [d.name for d in self._definitions.values() if d.reference_unit == name]
-        if dependents:
-            raise InvalidConversionError(
-                "Cannot remove %r: it is the reference of %s." % (name, ", ".join(sorted(dependents))),
-                code="UNIT_IN_USE",
-                field="name",
-            )
-        defs = dict(self._definitions)
-        del defs[name]
-        self._commit(defs)
-
-    # ----------------------------------------------------------- serialization
-    def to_dict(self) -> Dict[str, Any]:
-        """Serialise the custom units (standard units are built in)."""
-        return {
-            "type": "atica.unit_registry",
-            "schema_version": SCHEMA_VERSION,
-            "custom_units": [d.to_dict() for d in self._definitions.values()],
-        }
-
-    def load_dict(self, data: Dict[str, Any]) -> None:
-        """Replace the custom units with those in ``data`` (all-or-nothing)."""
-        if not isinstance(data, dict) or data.get("type") != "atica.unit_registry":
-            raise ConfigurationError("Not an ATICA unit registry configuration.")
-        version = data.get("schema_version")
-        if not isinstance(version, int) or version < 1 or version > SCHEMA_VERSION:
-            raise ConfigurationError("Unsupported unit registry schema version %r." % (version,))
-        items = data.get("custom_units")
-        if not isinstance(items, list):
-            raise ConfigurationError("'custom_units' must be a list.")
-        defs: Dict[str, CustomUnitDefinition] = {}
-        for item in items:
-            if not isinstance(item, dict):
-                raise ConfigurationError("Each custom unit must be an object.")
             try:
-                name = validate_identifier(item["name"])
-                if name in defs or name in self._aliases:
-                    raise InvalidConversionError(
-                        "Duplicate unit identifier %r." % name, code="DUPLICATE_UNIT", field="name"
-                    )
-                meta = item.get("metadata") or {}
-                if not isinstance(meta, dict):
-                    raise ConfigurationError("metadata must be an object.")
-                defs[name] = CustomUnitDefinition(
-                    name=name,
-                    category=str(item["category"]),
-                    reference_unit=str(item["reference_unit"]),
-                    factor=parse_factor(item["factor"]),
-                    symbol=item.get("symbol"),
-                    display_name=item.get("display_name"),
-                    metadata=meta,
+                ratio = to_fraction(factor, "factor")
+            except ValidationError as exc:
+                raise UnitDefinitionError(str(exc), parameter="factor") from exc
+            if ratio <= 0:
+                raise UnitDefinitionError(
+                    "The conversion factor must be greater than zero (got %s)." % _show(ratio),
+                    parameter="factor",
                 )
-            except KeyError as exc:
-                raise ConfigurationError("Custom unit is missing field %s." % exc) from None
-        self._commit(defs)
+            alias_list: List[str] = []
+            for alias in aliases:
+                alias = self._validate_new_name(alias, "alias")
+                if alias == name or alias in alias_list:
+                    raise UnitDefinitionError("Duplicate alias %r." % alias, parameter="aliases")
+                alias_list.append(alias)
+            unit = Unit(
+                symbol=name,
+                name=display_name or name,
+                category=ref.category,
+                factor=ratio * ref.factor,
+                aliases=tuple(alias_list),
+                custom=True,
+                definition=(ref.symbol, ratio),
+            )
+            self._add(unit)
+            return unit
+
+    def register_base_unit(self, name: str, category: str, *, aliases: Iterable[str] = ()) -> Unit:
+        """Create a brand-new measurement category with its base unit (e.g. ``'sheet'``, ``'sheets'``).
+
+        Further units of that category are then added with :meth:`register_unit`.
+        """
+        with self._lock:
+            self._check_mutable()
+            if not isinstance(category, str) or not category.strip():
+                raise UnitDefinitionError("A category name must be a non-empty string.", parameter="category")
+            category = category.strip()
+            if category in self._bases:
+                raise UnitDefinitionError("Category %r already exists." % category, parameter="category")
+            name = self._validate_new_name(name)
+            alias_list = [self._validate_new_name(a, "alias") for a in aliases]
+            unit = Unit(
+                name,
+                name,
+                category,
+                Fraction(1),
+                aliases=tuple(alias_list),
+                custom=True,
+                definition=(name, Fraction(1)),
+            )
+            self._bases[category] = name
+            self._add(unit)
+            return unit
+
+    def unregister_unit(self, name: str) -> None:
+        """Remove a custom unit (not allowed for built-in units or units others are defined from)."""
+        with self._lock:
+            self._check_mutable()
+            unit = self.get(name)
+            if not unit.custom:
+                raise UnsupportedOperationError(
+                    "%s is a built-in unit and cannot be removed." % unit.symbol, parameter="name"
+                )
+            if self._bases.get(unit.category) == unit.symbol:
+                raise UnsupportedOperationError(
+                    "%s is the base unit of a custom category." % unit.symbol, parameter="name"
+                )
+            users = [
+                u.symbol
+                for u in self._units.values()
+                if u.definition and u.definition[0] == unit.symbol and u is not unit
+            ]
+            if users:
+                raise UnsupportedOperationError(
+                    "%s is the reference of %s." % (unit.symbol, ", ".join(users)),
+                    parameter="name",
+                    hint="Remove those units first.",
+                )
+            for key in (unit.symbol, *unit.aliases):
+                self._lookup.pop(key, None)
+            del self._units[unit.symbol]
+
+    def custom_units(self) -> Tuple[Unit, ...]:
+        """User-defined units, in registration order."""
+        return tuple(u for u in self._units.values() if u.custom)
+
+    # ----------------------------------------------------------- serialisation
+    def to_dict(self) -> Dict[str, Any]:
+        """JSON-friendly description of the custom units/categories (built-ins are implicit)."""
+        items: List[Dict[str, Any]] = []
+        for unit in self.custom_units():
+            assert unit.definition is not None
+            if self._bases.get(unit.category) == unit.symbol:
+                items.append({"name": unit.symbol, "category": unit.category, "aliases": list(unit.aliases)})
+            else:
+                ref, ratio = unit.definition
+                items.append(
+                    {
+                        "name": unit.symbol,
+                        "reference_unit": ref,
+                        "factor": "%d/%d" % (ratio.numerator, ratio.denominator),
+                        "aliases": list(unit.aliases),
+                        "display_name": unit.name,
+                    }
+                )
+        return {"format": _REGISTRY_FORMAT, "version": _REGISTRY_VERSION, "custom_units": items}
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "UnitRegistry":
-        reg = cls()
-        reg.load_dict(data)
-        return reg
+    def from_dict(cls, data: Mapping[str, Any]) -> UnitRegistry:
+        """Rebuild a registry written by :meth:`to_dict` (all-or-nothing)."""
+        if not isinstance(data, Mapping) or data.get("format") != _REGISTRY_FORMAT:
+            raise UnitDefinitionError("Not an ATICA unit registry description.", parameter="data")
+        if data.get("version") != _REGISTRY_VERSION:
+            raise UnitDefinitionError(
+                "Unsupported registry version %r." % (data.get("version"),), parameter="data"
+            )
+        registry = cls()
+        for item in data.get("custom_units", []):
+            try:
+                if "category" in item:
+                    registry.register_base_unit(
+                        item["name"], item["category"], aliases=item.get("aliases", ())
+                    )
+                else:
+                    registry.register_unit(
+                        item["name"],
+                        item["factor"],
+                        item["reference_unit"],
+                        aliases=item.get("aliases", ()),
+                        display_name=item.get("display_name"),
+                    )
+            except (KeyError, TypeError) as exc:
+                raise UnitDefinitionError(
+                    "Malformed custom unit entry: %r (%s)." % (item, exc), parameter="data"
+                ) from None
+        return registry
 
-    def save(self, path: str) -> None:
-        with open(os.fspath(path), "w", encoding="utf-8") as fh:
-            json.dump(self.to_dict(), fh, indent=2)
+    def copy(self) -> UnitRegistry:
+        """An independent, writable copy."""
+        return UnitRegistry.from_dict(self.to_dict())
 
-    def load(self, path: str) -> None:
-        try:
-            with open(os.fspath(path), "r", encoding="utf-8") as fh:
-                data = json.load(fh)
-        except (OSError, ValueError) as exc:
-            raise ConfigurationError("Cannot read unit configuration: %s" % exc) from exc
-        self.load_dict(data)
 
-    def copy(self) -> "UnitRegistry":
-        other = UnitRegistry()
-        other.load_dict(self.to_dict())
-        return other
+def _show(value: Fraction) -> str:
+    if value.denominator == 1:
+        return str(value.numerator)
+    from ..core.precision import format_decimal
+
+    exact = fraction_to_decimal(value)
+    if Fraction(exact) == value:
+        return format_decimal(exact)
+    return "%d/%d" % (value.numerator, value.denominator)
+
+
+def _norm(value: Decimal) -> Decimal:
+    from ..core.precision import normalize
+
+    return normalize(value)

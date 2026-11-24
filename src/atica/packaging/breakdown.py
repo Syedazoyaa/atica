@@ -1,144 +1,199 @@
-"""Quantity conversion and package breakdown (M04)."""
+"""Quantity conversion and breakdown between packaging levels.
+
+All arithmetic is exact (fractions); results are Decimals.
+"""
+
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
-from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
-from typing import Any, Dict, List
+from decimal import Decimal
+from fractions import Fraction
+from typing import Any, Dict, Tuple
 
-from ..calculations.numeric import calc_context, clean, format_quantity, plain_number, to_decimal
-from ..exceptions import InvalidQuantityError, PackagingError
-from .product import Product
+from ..core.exceptions import InvalidQuantityError
+from ..core.precision import dec, display_decimal
+from ..core.results import Result
+from ..core.validation import non_negative
+from .hierarchy import Product
 
 
 @dataclass(frozen=True)
-class BreakdownResult:
-    """Result of :func:`breakdown`.
+class PackagingBreakdown(Result):
+    """Result of :func:`breakdown` (``quantity`` of ``from_level`` expressed in ``to_level`` packages).
 
-    * ``full_packages``      - complete ``to_unit`` packages;
-    * ``remaining_quantity`` - leftover, in ``from_unit`` (never discarded);
-    * ``packages_required``  - packages needed to hold the *entire* quantity;
-    * ``exact_equivalent``   - exact (possibly fractional) package equivalent;
-    * ``total_quantity``     - the input quantity, in ``from_unit``.
+    * ``exact_packages``    - the exact (possibly fractional) conversion, a ratio;
+    * ``full_packages``     - complete ``to_level`` packages (``floor(exact_packages)``);
+    * ``remainder``         - what is left after the full packages, in ``remainder_unit``
+      (the *smaller* of the two levels, so going 250 piece -> carton leaves "10 piece");
+    * ``packages_required`` - whole packages needed to hold **everything** (``ceil``);
+    * ``packaged_quantity`` - quantity those required packages cover, in ``from_level`` units;
+    * ``surplus``           - ``packaged_quantity - quantity`` (>= 0), in ``from_level`` units;
+    * ``units_per_package`` - how many ``from_level`` units fill one ``to_level`` package.
     """
 
     product_id: str
-    from_unit: str
-    to_unit: str
-    total_quantity: Decimal
+    quantity: Decimal
+    from_level: str
+    to_level: str
+    exact_packages: Decimal
     full_packages: Decimal
-    remaining_quantity: Decimal
+    remainder: Decimal
+    remainder_unit: str
     packages_required: Decimal
-    exact_equivalent: Decimal
-    package_size: Decimal  # from_units per to_unit (<1 when converting to a smaller unit)
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "full_packages": plain_number(self.full_packages),
-            "remaining_quantity": plain_number(self.remaining_quantity),
-            "packages_required": plain_number(self.packages_required),
-            "total_quantity": plain_number(self.total_quantity),
-            "exact_equivalent": plain_number(self.exact_equivalent),
-        }
+    packaged_quantity: Decimal
+    surplus: Decimal
+    units_per_package: Decimal
+    formula: str = "exact = quantity x size(from) / size(to); full = floor(exact); required = ceil(exact)"
+    warnings: Tuple[str, ...] = ()
 
     def __str__(self) -> str:
-        f = format_quantity
-        text = "%s %s = %s full %s" % (f(self.total_quantity), self.from_unit, f(self.full_packages), self.to_unit)
-        if self.remaining_quantity:
-            text += " + %s %s remaining" % (f(self.remaining_quantity), self.from_unit)
-        return text + " (%s %s required)" % (f(self.packages_required), self.to_unit)
-
-
-def _prepare(product: Product, quantity: Any, from_unit: str, allow_partial: bool) -> Decimal:
-    if not isinstance(product, Product):
-        raise PackagingError("A Product is required.", code="UNKNOWN_PRODUCT", field="product")
-    product.require_valid()
-    qty = to_decimal(quantity, field="quantity")
-    if qty < 0:
-        raise InvalidQuantityError("Quantity cannot be negative (got %s)." % qty, code="NEGATIVE_QUANTITY", field="quantity")
-    if not allow_partial and qty != qty.to_integral_value():
-        raise InvalidQuantityError(
-            "Quantity %s is fractional; pass allow_partial=True to allow partial packages." % qty,
-            code="PARTIAL_NOT_ALLOWED",
-            field="quantity",
+        text = "%s %s = %s full %s" % (
+            _f(self.quantity),
+            self.from_level,
+            _f(self.full_packages),
+            self.to_level,
         )
-    return qty
+        if self.remainder:
+            text += " + %s %s remaining" % (_f(self.remainder), self.remainder_unit)
+        return text + " (%s %s required)" % (_f(self.packages_required), self.to_level)
 
 
-def convert_quantity(product: Product, quantity: Any, from_unit: str, to_unit: str, *, allow_partial: bool = True) -> Decimal:
-    """Exact package equivalent of ``quantity`` (e.g. 850 cartons -> 21.25 pallets)."""
-    qty = _prepare(product, quantity, from_unit, allow_partial)
-    with calc_context():
-        return clean(qty * product.base_size(from_unit) / product.base_size(to_unit))
+@dataclass(frozen=True)
+class PackagingPlan(Result):
+    """Result of :func:`decompose`: a quantity as whole packages at every level.
+
+    ``counts`` lists ``(level, whole_count)`` from the largest level to the *second* smallest;
+    ``remainder`` is what is left in the base unit (``base_unit``) and may be fractional.
+    ``sum(count * size(level)) + remainder == quantity`` in base units.
+    """
+
+    product_id: str
+    quantity: Decimal
+    from_level: str
+    counts: Tuple[Tuple[str, Decimal], ...]
+    remainder: Decimal
+    base_unit: str
+
+    def by_level(self) -> Dict[str, Decimal]:
+        """``{level: count}`` including the base level's remainder."""
+        out = dict(self.counts)
+        out[self.base_unit] = self.remainder
+        return out
+
+
+def _f(value: Decimal) -> str:
+    return display_decimal(value)
+
+
+def _quantity(quantity: Any, require_whole: bool) -> Fraction:
+    q = non_negative(quantity, "quantity")
+    if require_whole and q.denominator != 1:
+        raise InvalidQuantityError(
+            "quantity %s is not a whole number." % quantity,
+            parameter="quantity",
+            hint="Pass require_whole=False to allow fractional quantities.",
+        )
+    return q
+
+
+def convert_quantity(product: Product, quantity: Any, from_level: str, to_level: str) -> Decimal:
+    """Exact equivalent of ``quantity`` ``from_level`` in ``to_level`` (850 cartons -> 21.25 pallets).
+
+    Formula: ``quantity x size(from_level) / size(to_level)`` where ``size`` counts base units.
+    """
+    q = _quantity(quantity, False)
+    return dec(q * product._size(from_level) / product._size(to_level))
 
 
 def breakdown(
     product: Product,
     quantity: Any,
-    from_unit: str,
-    to_unit: str,
+    from_level: str,
+    to_level: str,
     *,
-    allow_partial: bool = False,
-) -> BreakdownResult:
-    """Break ``quantity`` of ``from_unit`` into whole ``to_unit`` packages.
+    require_whole: bool = False,
+) -> PackagingBreakdown:
+    """Break ``quantity`` of ``from_level`` into ``to_level`` packages.
 
-    >>> breakdown(product, "850", "carton", "pallet").to_dict()["full_packages"]
-    21
+    :param product: the :class:`Product` that defines the hierarchy.
+    :param quantity: non-negative amount of ``from_level`` units (fractions allowed).
+    :param from_level: level the quantity is measured in, e.g. ``"piece"``.
+    :param to_level: level to pack into, e.g. ``"carton"`` (may be larger or smaller).
+    :param require_whole: reject fractional quantities.
+    :returns: :class:`PackagingBreakdown`.
+    :raises UnknownPackagingLevelError: a level is not in the product.
+    :raises InvalidQuantityError: negative / non-numeric / (with ``require_whole``) fractional quantity.
+
+    With 1 carton = 20 boxes = 240 pieces, 250 pieces give ``full_packages=1``,
+    ``remainder=10 piece`` and ``packages_required=2``.
+
+    >>> from atica.packaging import PackagingLevel, Product
+    >>> p = Product("P", "A", levels=[PackagingLevel("piece"), PackagingLevel("box", 12, "piece"),
+    ...                               PackagingLevel("carton", 20, "box")])
+    >>> r = breakdown(p, 250, "piece", "carton")
+    >>> (int(r.full_packages), int(r.remainder), int(r.packages_required))
+    (1, 10, 2)
     """
-    qty = _prepare(product, quantity, from_unit, allow_partial)
-    src = product.get_level(from_unit).name
-    dst = product.get_level(to_unit).name
-    size_src, size_dst = product.base_size(src), product.base_size(dst)
-    with calc_context():
-        if size_dst >= size_src:
-            per_package = size_dst / size_src  # from_units per to_unit (a whole number)
-            exact = qty / per_package
-            full = exact.to_integral_value(rounding=ROUND_FLOOR)
-            remaining = qty - full * per_package
-            required = exact.to_integral_value(rounding=ROUND_CEILING)
-            size = per_package
-        else:  # converting to a smaller unit: everything is "full"
-            per_unit = size_src / size_dst  # to_units per from_unit
-            exact = qty * per_unit
-            full = exact.to_integral_value(rounding=ROUND_FLOOR)
-            remaining = Decimal(0)
-            required = exact.to_integral_value(rounding=ROUND_CEILING)
-            if full != exact:
-                remaining = (exact - full) / per_unit  # in from_unit, keeps the fractional part
-            size = Decimal(1) / per_unit
-        return BreakdownResult(
-            product_id=product.product_id,
-            from_unit=src,
-            to_unit=dst,
-            total_quantity=clean(qty),
-            full_packages=clean(full),
-            remaining_quantity=clean(remaining),
-            packages_required=clean(required),
-            exact_equivalent=clean(exact),
-            package_size=clean(size),
-        )
+    q = _quantity(quantity, require_whole)
+    src, dst = product.level(from_level), product.level(to_level)
+    size_src, size_dst = product._size(src.name), product._size(dst.name)
+    exact = q * size_src / size_dst
+    full = math.floor(exact)
+    required = math.ceil(exact)
+    per_package = size_dst / size_src  # from_level units per to_level package
+    if size_dst >= size_src:  # packing up: the leftover is in from_level units
+        remainder, remainder_unit = q - full * per_package, src.name
+    else:  # splitting down: the leftover is a fraction of one to_level unit
+        remainder, remainder_unit = exact - full, dst.name
+    packaged = required * per_package
+    return PackagingBreakdown(
+        product_id=product.product_id,
+        quantity=dec(q),
+        from_level=src.name,
+        to_level=dst.name,
+        exact_packages=dec(exact),
+        full_packages=Decimal(full),
+        remainder=dec(remainder),
+        remainder_unit=remainder_unit,
+        packages_required=Decimal(required),
+        packaged_quantity=dec(packaged),
+        surplus=dec(packaged - q),
+        units_per_package=dec(per_package),
+    )
 
 
-def decompose(product: Product, quantity: Any, from_unit: str) -> Dict[str, Decimal]:
+def packages_required(product: Product, quantity: Any, from_level: str, to_level: str) -> Decimal:
+    """Minimum whole ``to_level`` packages needed to hold ``quantity`` of ``from_level`` (package ceiling)."""
+    return breakdown(product, quantity, from_level, to_level).packages_required
+
+
+def decompose(product: Product, quantity: Any, from_level: str = "") -> PackagingPlan:
     """Express ``quantity`` as whole packages at every level, largest first.
 
-    With 1 box = 12 pieces, 1 carton = 20 boxes and 1 pallet = 40 cartons,
-    ``decompose(product, 262, "piece")`` -> ``{"pallet": 0, "carton": 1, "box": 1, "piece": 10}``.
-    The quantity must be a whole number of base units.
+    ``from_level`` defaults to the base level.  With 1 box = 12 pieces, 1 carton = 20 boxes,
+    250 pieces -> 1 carton, 0 boxes, 10 pieces.
+
+    >>> from atica.packaging import PackagingLevel, Product
+    >>> p = Product("P", "A", levels=[PackagingLevel("piece"), PackagingLevel("box", 12, "piece"),
+    ...                               PackagingLevel("carton", 20, "box")])
+    >>> {k: int(v) for k, v in decompose(p, 250).by_level().items()}
+    {'carton': 1, 'box': 0, 'piece': 10}
     """
-    qty = _prepare(product, quantity, from_unit, allow_partial=True)
-    with calc_context():
-        total_base = qty * product.base_size(from_unit)
-        if total_base != total_base.to_integral_value():
-            raise InvalidQuantityError(
-                "Quantity is not a whole number of base units (%s)." % format_quantity(total_base),
-                code="PARTIAL_NOT_ALLOWED",
-                field="quantity",
-            )
-        result: Dict[str, Decimal] = {}
-        remaining = total_base
-        for level in reversed(product.levels):
-            size = product.base_size(level.name)
-            count = (remaining // size)
-            result[level.name] = clean(count)
-            remaining -= count * size
-    return result
+    q = _quantity(quantity, False)
+    src = product.level(from_level) if from_level else product.base_level
+    remaining = q * product._size(src.name)  # in base units
+    counts = []
+    for level in reversed(product.levels[1:]):
+        size = product._size(level.name)
+        n = math.floor(remaining / size)
+        counts.append((level.name, Decimal(n)))
+        remaining -= n * size
+    return PackagingPlan(
+        product_id=product.product_id,
+        quantity=dec(q),
+        from_level=src.name,
+        counts=tuple(counts),
+        remainder=dec(remaining),
+        base_unit=product.base_level.name,
+    )

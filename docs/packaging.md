@@ -1,60 +1,76 @@
-# Packaging hierarchies (M03) and breakdown (M04)
+# Packaging - `atica.packaging`
 
-## Direction of a relationship
-
-```python
-PackagingLevel("box", contains=12, parent="piece")   # one box contains 12 pieces
-```
-
-`parent` is the **smaller level that `contains` counts** (this follows the example in the specification). The base level
-(the smallest) has no parent and `contains == 1`. A valid hierarchy is a single chain: exactly one base level and each level is
-the `parent` of at most one other level.
-
-Level names are matched case-insensitively (`"Pallet"` finds `pallet`).
-
-## Product API
+Multi-level packaging hierarchies and exact quantity conversion between levels.
 
 ```python
-Product(product_id, name, description="", metadata=None)
-product.add_level(level)                      # rejects duplicates, bad quantities, self-reference
-product.update_level("box", contains=6)       # validated, unchanged on failure
-product.remove_level("pallet")                # refused while another level is built from it
-product.levels / packaging_hierarchy / base_packaging_unit / has_level(name) / get_level(name)
-product.validate() -> ValidationResult        # never raises
-product.base_size("pallet")                   # base units (pieces) in one pallet
-product.units_per("pallet", "carton")         # 40
-product.to_dict() / Product.from_dict(d) / product.copy()
+from atica.packaging import Product, PackagingLevel, breakdown, decompose
+
+product = Product(
+    "P001",
+    "Product A",
+    levels=[
+        PackagingLevel("piece"),
+        PackagingLevel("box", 12, "piece"),  # 1 box    = 12 pieces
+        PackagingLevel("carton", 20, "box"),  # 1 carton = 20 boxes  (= 240 pieces)
+    ],
+)
+
+r = breakdown(product, 250, "piece", "carton")
+print(r.full_packages)  # 1     complete cartons
+print(r.remainder)  # 10    pieces left over (r.remainder_unit == "piece")
+print(r.packages_required)  # 2     minimum whole cartons to hold all 250
+
+print(
+    {k: int(v) for k, v in decompose(product, 250).by_level().items()}
+)  # {'carton': 1, 'box': 0, 'piece': 10}
 ```
 
-Levels can be added in any order; the hierarchy is checked when you validate or calculate.
+## `PackagingLevel(name, contains=1, of=None)`
 
-### Validation codes
+"One `name` contains `contains` units of the level `of`." The base (smallest) level has no `of` and contains exactly 1. `contains` must be a **positive whole number** (a box cannot hold 12.5 pieces). Names are matched ignoring case and surrounding spaces.
 
-`MISSING_LEVELS`, `DUPLICATE_LEVEL`, `INVALID_PACKAGE_QUANTITY` (must be a positive whole number), `MISSING_LEVEL`
-(parent not defined), `CIRCULAR_HIERARCHY`, `DISCONNECTED_HIERARCHY` (several base levels or branches),
-`INCONSISTENT_RELATIONSHIP` (base level must contain 1).
+## `Product(product_id, name="", levels=())`
 
-Calculations on an invalid product raise `InvalidHierarchyError` with the first problem (all problems in `exc.details`).
+Immutable and **validated on construction**, so a `Product` is always consistent. It rejects: duplicate names, no base level, several base levels, a missing referenced level, self-reference, circular chains, branching (two levels built from the same level) - each with `InvalidHierarchyError` and a hint.
 
-## Breakdown
+Level order in the list does not matter. Calculations never modify a product; "changing" one returns a new product:
 
-```python
-breakdown(product, quantity, from_unit, to_unit, *, allow_partial=False) -> BreakdownResult
-```
+| Member | Purpose |
+|---|---|
+| `level_names`, `levels`, `base_level` | levels, smallest first |
+| `level(name)`, `has_level(name)` | lookup (`UnknownPackagingLevelError` lists the available names) |
+| `size_of(level) -> Decimal` | base units in one `level` (carton -> 240) |
+| `units_per(larger, smaller) -> Decimal` | e.g. `units_per("carton", "box") == 20`; reversed gives `0.05` |
+| `with_level(level)`, `without_top_level()` | new products; the original is untouched |
+| `to_dict()`, `Product.from_dict(data)` | plain-data round trip |
+
+## `breakdown(product, quantity, from_level, to_level, *, require_whole=False) -> PackagingBreakdown`
+
+| Parameter | Meaning |
+|---|---|
+| `quantity` | non-negative amount counted in `from_level` units (fractions allowed unless `require_whole=True`) |
+| `from_level`, `to_level` | level names (to_level may be larger *or* smaller) |
+
+Result fields:
 
 | Field | Meaning |
 |---|---|
-| `full_packages` | complete `to_unit` packages |
-| `remaining_quantity` | leftover in `from_unit` - never discarded |
-| `packages_required` | packages needed to hold everything (`ceil`) |
-| `exact_equivalent` | exact, possibly fractional, equivalent |
-| `total_quantity` | the input quantity |
+| `exact_packages` | exact conversion (a ratio, may be fractional) |
+| `full_packages` | complete `to_level` packages: `floor(exact)` |
+| `remainder`, `remainder_unit` | what is left after the full packages, in the **smaller** of the two levels (250 piece -> carton leaves `10 piece`; 2.33 carton -> box leaves `0.6 box`) |
+| `packages_required` | minimum whole packages to hold **everything**: `ceil(exact)` |
+| `packaged_quantity`, `surplus` | quantity those required packages cover and the unused part, in `from_level` units |
+| `units_per_package` | `from_level` units per `to_level` package |
 
-850 cartons into pallets (1 pallet = 40 cartons) gives 21 full pallets, 10 cartons left, 22 pallets required.
-Converting to a *smaller* unit (`2 pallet -> carton`) gives 80 full cartons and no remainder.
-Fractional quantities raise `PARTIAL_NOT_ALLOWED` unless `allow_partial=True`; negative quantities raise `NEGATIVE_QUANTITY`.
+**Formulas** `exact = quantity x size(from) / size(to)`; `full = floor(exact)`; `required = ceil(exact)`; going up: `remainder = quantity - full x size(to)/size(from)`; going down: `remainder = exact - full`.
 
-Related helpers: `convert_quantity(product, qty, from, to)` (exact equivalent) and
-`decompose(product, qty, from_unit)` (`262 pieces -> {'pallet': 0, 'carton': 1, 'box': 1, 'piece': 10}`).
+Exact vs whole-package: `exact_packages` is the mathematical conversion; `full_packages` and `packages_required` are the two whole-package answers (round down / round up). Nothing is discarded: the remainder is always reported. All arithmetic is exact, so `240 pieces` is exactly `1` carton - never `0.99999`.
 
-Each product has its own hierarchy; products never share or leak configuration.
+**Raises** `UnknownPackagingLevelError`, `InvalidHierarchyError` (product has no levels), `InvalidQuantityError` (negative, non-numeric, fractional with `require_whole`), `MissingInputError`.
+
+## Other functions
+
+* `convert_quantity(product, quantity, from_level, to_level) -> Decimal` - the exact equivalent only (`850 carton -> 21.25 pallet`).
+* `packages_required(product, quantity, from_level, to_level) -> Decimal` - just the minimum whole packages.
+* `decompose(product, quantity, from_level="") -> PackagingPlan` - the quantity as whole packages at **every** level, largest first; `remainder` is what is left in the base unit and may be fractional. `by_level()` gives `{level: count}`. Invariant: `sum(count x size(level)) + remainder == quantity` (in base units).
+* `levels_from_pairs([("piece", 1), ("box", 12), ("carton", 20)])` - build levels from `(name, count)` pairs, smallest first.

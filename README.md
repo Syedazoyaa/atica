@@ -1,110 +1,111 @@
 # ATICA
 
-Manufacturing units, packaging and quantity conversion for Python.
+**Manufacturing calculations for Python - and a desktop app on top of them.**
 
-ATICA combines three things in one dependency-free library:
+ATICA is one Python package (`atica`) with two parts that share one version:
 
-**Physical measurement intelligence** + **product-specific packaging logic** + **a manufacturing calculation engine.**
-
-It ships as a Python library (`pip install atica`) and as a separate desktop application (`app/gui`, PySide6).
-
-## Features
-
-| Module | What it does |
-|---|---|
-| M01 Units | 16 measurement categories, own conversion engine (no Pint), temperature scales, approximate-factor warnings |
-| M02 Custom units | `1 industrial_bag = 25 kg`, chained definitions, circular-definition detection, isolated registries, save/load |
-| M03 Packaging | Per-product hierarchies (piece → box → carton → pallet), full validation, serialization |
-| M04 Breakdown | Full packages, **remainders**, packages required, exact equivalents |
-| M05 Manufacturing | Material requirements, batches, safe formula evaluator (never `eval`) |
-| M06 Yield & scrap | Required input, expected output, yield, scrap %, wastage |
-| M07 Purchasing | MOQ, order multiples, stock on hand, supplier rules with unit/package conversion |
-| M08 Bulk | CSV (stdlib) and Excel (optional) with row-level errors and safe export |
-| M09 Validation | Structured `{valid, errors[{code, field, message}], warnings}` results |
-| M10 Rounding | Eight policies, chosen **per operation** - never one global rule |
-
-All arithmetic uses `Decimal`. The core needs only the standard library.
-
-## Install
+| Part | What it is | How you use it |
+|---|---|---|
+| **Calculation library** | Exact, validated manufacturing maths: units, packaging, bills of materials, production, yield & scrap, purchasing. Standard library only. | `from atica.units import convert` |
+| **Desktop application** | A polished PySide6 interface over the *same* public API, for people who prefer a window to a script. | `atica-gui` |
 
 ```bash
-pip install atica              # core library, no dependencies
-pip install "atica[excel]"     # + .xlsx support (openpyxl)
+pip install atica
 ```
 
-Supports Python 3.9+.
+That one command installs both. Nothing else is needed to import the library or to launch the app.
 
-## Quick start
+## What problem does it solve?
+
+Manufacturing code is full of small calculations that are easy to get *almost* right: `250 pieces` is `1 carton + 10 pieces` but needs `2 cartons` to ship; a 5 % scrap rate means you must *start* `1000 / 0.95` units, not `1000 x 1.05`; `212 F` is not `212 x 5/9 C`. ATICA does these once, exactly (`Decimal` results, exact rational arithmetic inside), with explicit rounding, explicit denominators for every percentage, and errors that say what to fix.
+
+## What ATICA is *not*
+
+Not an ERP, inventory, warehouse, MES, supplier-management or scheduling system; not a database or a GUI framework. It calculates. You keep the data.
+
+## Requirements
+
+* Python **3.9 - 3.13** (the calculation core is tested on all of them).
+* `PySide6` is installed automatically (the desktop app is part of the product). The library itself imports nothing outside the standard library and never loads Qt - `import atica` is fast and headless-safe.
+* Optional: `pip install "atica[excel]"` for `.xlsx` import/export.
+
+## Method A - use the library
 
 ```python
-from atica.units import convert, register_unit
+from atica.units import convert
 
-print(convert("2.5", "kg", "g"))             # 2500 g
-print(convert(212, "F", "C"))                # 100 celsius
-register_unit("industrial_bag", "mass", "kg", "25")
-print(convert(4, "industrial_bag", "kg"))    # 100 kg
+result = convert(25, "kg", "g")
+print(result)            # 25000 g
+print(result.value)      # Decimal('25000')
 ```
 
 ```python
 from atica.packaging import Product, PackagingLevel, breakdown
 
-product = Product("PROD-001", "Product A")
-product.add_level(PackagingLevel("piece", contains=1))
-product.add_level(PackagingLevel("box", contains=12, parent="piece"))      # 1 box = 12 pieces
-product.add_level(PackagingLevel("carton", contains=20, parent="box"))     # 1 carton = 20 boxes
-product.add_level(PackagingLevel("pallet", contains=40, parent="carton"))  # 1 pallet = 40 cartons
+product = Product("P001", "Product A", levels=[
+    PackagingLevel("piece"),
+    PackagingLevel("box", 12, "piece"),      # 1 box    = 12 pieces
+    PackagingLevel("carton", 20, "box"),     # 1 carton = 20 boxes
+])
 
-result = breakdown(product, "850", "carton", "pallet")
-result.to_dict()
-# {'full_packages': 21, 'remaining_quantity': 10, 'packages_required': 22,
-#  'total_quantity': 850, 'exact_equivalent': Decimal('21.25')}
+r = breakdown(product, 250, "piece", "carton")
+print(r)                                   # 250 piece = 1 full carton + 10 piece remaining (2 carton required)
+print(r.full_packages, r.remainder, r.packages_required)   # 1 10 2
 ```
 
 ```python
-from atica.manufacturing import calculate_material_requirement
-from atica.inventory import calculate_purchase_quantity
+from atica.materials import Bom, BomItem, calculate_bom_requirements
 
-print(calculate_material_requirement(material_per_unit="0.5", production_quantity=1000, material_unit="kg"))  # 500 kg
-print(calculate_material_requirement(target_output=1000, scrap_rate="0.05", rounding="up"))                    # 1053
-print(calculate_purchase_quantity(required_quantity=87, order_multiple=12, minimum_order_quantity=24))         # 96 pieces
+bom = Bom([
+    BomItem("steel", "0.25", "kg"),
+    BomItem("paint", "40", "mL", wastage_percent=10),
+])
+result = calculate_bom_requirements(bom=bom, production_quantity=1000, scrap_percent=5)
+print(result["steel"])                     # 263.1578947368 kg
 ```
 
 ```python
-from atica.io import process_file, export_results, export_errors
+from atica.quality import calculate_required_input
 
-bulk = process_file("orders.csv", products=[product])      # columns: Product, Quantity, From Unit, To Unit
-print(bulk.summary)                                         # {'total_rows': 3, 'succeeded': 3, 'failed': 0, ...}
-export_results(bulk, "results.csv")
-export_errors(bulk, "errors.csv")
+print(calculate_required_input(950, scrap_percent=5))   # 1000
 ```
+
+Every calculation returns a small immutable result object (`.to_dict()`, `.explain()`), raises a specific `AticaError` subclass on bad input, and never returns a made-up value.
+
+## Method B - use the desktop app
+
+```bash
+pip install atica
+atica-gui
+```
+
+(`python -m atica` does the same.) Ten sections: Dashboard, Unit Converter, Packaging, Materials and BOM, Production, Quality and Yield, Purchasing, Data Tools, Settings, About. Every screen calls the public functions listed in this README - the GUI contains no formulas of its own. See [docs/gui.md](docs/gui.md).
+
+## Calculation domains
+
+| Module | Import | Highlights |
+|---|---|---|
+| Units | `atica.units` | 17 categories, exact factors, temperature offsets, custom units & registries, incompatible conversions rejected |
+| Packaging | `atica.packaging` | multi-level hierarchies, full packages, remainders, minimum whole packages, immutable products |
+| Materials / BOM | `atica.materials` | multi-material BOMs, scrap & wastage allowances, unit conversion, capacity from stock |
+| Production | `atica.production` | batches (full vs required), batch materials, time, capacity, quantity constraints |
+| Quality | `atica.quality` | first-pass vs final yield, scrap, rework, recovery, wastage - denominators stated |
+| Purchasing | `atica.purchasing` | stock deduction, MOQ, order multiples, purchase-unit conversion, surplus |
+| Integrations | `atica.integrations` | CSV (stdlib) and Excel (optional) conversion and BOM import |
 
 ## Conventions worth knowing
 
-* **Packaging direction.** `PackagingLevel("box", contains=12, parent="piece")` means *one box contains 12 pieces*; `parent` names the smaller level that `contains` counts. The base level has no parent and contains 1.
-* **Rates are fractions.** `scrap_rate="0.05"` is 5 %. Every function that takes a rate also accepts a `*_percent` form.
-* **Nothing is silently rounded.** Remainders are reported; rounding is requested explicitly per call (`rounding=`, `places=`, `multiple=`).
-* **Unit identifiers are case-sensitive** so `mW` and `MW` can never be confused. Aliases such as `lb`, `ft`, `C`, `F` are built in.
-* **Errors** derive from `AticaError`; each has a `.code` and `.message`.
+* **Percentages are on the 0-100 scale** and named `*_percent`: `scrap_percent=5` means 5 %. Each result states its denominator.
+* **Numbers are `Decimal`.** Inside, arithmetic is exact (`fractions.Fraction`); rounding to `precision` digits (default 50, configurable with `atica.use_precision`) happens once, at the end.
+* **Rounding is explicit.** Default is none; choose `rounding="half_up" | "half_even" | "floor" | "ceiling"` and `places=`. Package rounding (`round_to_multiple`, `split_by_multiple`) is separate from mathematical rounding.
+* **Unit names are case-sensitive** and never guessed: `"Kg"` is an error with a suggestion, not a silent `kg`.
 
-## Desktop app
+## Documentation
 
-```bash
-pip install atica PySide6
-python app/gui/main.py
-```
+* [Getting started](docs/getting-started.md) - [Units](docs/units.md) - [Packaging](docs/packaging.md) - [Materials & BOM](docs/materials.md) - [Production](docs/production.md) - [Quality](docs/quality.md) - [Purchasing](docs/purchasing.md) - [Integrations](docs/integrations.md)
+* [Core: precision, rounding, results, errors](docs/core.md) - [Architecture](docs/architecture.md) - [Desktop app](docs/gui.md)
+* [API reference](docs/api-reference.md) (generated from the source) - [Formulas](docs/formulas.md) - [Changelog](CHANGELOG.md) - [Release checklist](docs/release-checklist.md)
 
-See [docs/desktop_app.md](docs/desktop_app.md), including Windows packaging.
+## License
 
-## Development
-
-```bash
-pip install -e ".[dev]"
-```
-
-Documentation lives in [docs/](docs/): [getting started](docs/getting_started.md), [architecture](docs/architecture.md),
-[units](docs/units.md), [packaging](docs/packaging.md), [manufacturing](docs/manufacturing.md),
-[inventory](docs/inventory.md), [API reference](docs/api_reference.md).
-
-## Contributing & license
-
-See [CONTRIBUTING.md](CONTRIBUTING.md). Released under the [MIT License](LICENSE).
+MIT - see [LICENSE](LICENSE).

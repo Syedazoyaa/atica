@@ -1,38 +1,91 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.21"]
 build-backend = "hatchling.build"
 
 [project]
 name = "atica"
-version = "0.8.0"
-description = "Manufacturing units, packaging and quantity conversion library."
+dynamic = ["version"]
+description = "Manufacturing calculation library and desktop app: units, packaging, BOM, production, yield and purchasing."
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.9"
 authors = [{ name = "ATICA contributors" }]
-keywords = ["manufacturing", "unit conversion", "packaging", "inventory", "decimal"]
+keywords = ["manufacturing", "unit conversion", "packaging", "bill of materials", "yield", "scrap", "decimal", "pyside6"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Manufacturing",
-    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering",
+    "Typing :: Typed",
 ]
-# The core library has NO mandatory dependencies.
-dependencies = []
+# The calculation core uses only the standard library. PySide6 is required because the
+# desktop GUI ships in the same distribution and `pip install atica` must provide both.
+dependencies = ["PySide6>=6.5,<7"]
 
 [project.optional-dependencies]
 excel = ["openpyxl>=3.0"]
-gui = ["PySide6>=6.5"]
-dev = ["openpyxl>=3.0"]
+dev = [
+    "pytest>=8",
+    "pytest-cov>=5",
+    "hypothesis>=6.100",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "build>=1.2",
+    "twine>=5",
+    "openpyxl>=3.0",
+]
+
+[project.scripts]
+atica-gui = "atica.gui.app:main"
+
+[tool.hatch.version]
+path = "src/atica/version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/atica"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/atica", "docs", "README.md", "LICENSE", "CONTRIBUTING.md"]
+include = ["src/atica", "tests", "docs", "examples", "README.md", "LICENSE", "CHANGELOG.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = ["gui: tests that need PySide6 (run with QT_QPA_PLATFORM=offscreen)"]
+
+[tool.coverage.run]
+source = ["atica"]
+branch = true
+omit = ["*/atica/__main__.py"]
+
+[tool.ruff]
+line-length = 110
+src = ["src", "tests"]
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "C4", "RUF"]
+ignore = ["UP006", "UP007", "UP035", "UP045", "RUF012", "SIM108", "E501", "RUF001", "RUF002", "RUF003", "UP031"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["C408", "B011", "RUF015", "B905"]
+"src/atica/gui/**" = ["B008"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+files = ["src/atica"]
+exclude = ["src/atica/gui"]
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = ["atica.gui.*", "openpyxl.*", "PySide6.*"]
+ignore_missing_imports = true
+follow_imports = "skip"

@@ -1,82 +1,55 @@
 # Architecture
 
-## Layout
+One distribution (`atica`), one `pyproject.toml`, one version (`src/atica/version.py`), two components.
 
+```text
+Developer application ──┐
+                        ▼
+                  ATICA core API  ◀──── atica.gui (PySide6 desktop app)
 ```
+
+The core never imports the GUI; the GUI is a presentation layer that calls the **same public functions** a developer would. A test (`test_core_never_imports_gui`) and a second test (`test_no_arithmetic_in_controllers_and_services`) enforce both rules.
+
+## Package layout
+
+```text
 src/atica/
-  exceptions.py        error hierarchy (every error has .code, .message, .field)
-  results.py           CalculationResult - the common result model
-  config.py            AticaConfig: versioned save/load of units, products, materials, purchasing
-  calculations/        numeric.py (Decimal helpers), rounding.py (M10)
-  units/               M01 + M02: definitions, categories, registry, custom_units, converter (module API)
-  packaging/           M03 + M04: hierarchy (PackagingLevel), product (Product), breakdown
-  manufacturing/       M05 + M06: materials, batches, formulas, yield_scrap
-  inventory/           M07: purchasing
-  validation/          M09: result model + rules per area
-  io/                  M08: csv_handler, excel_handler, bulk
-app/gui/               PySide6 desktop app (calls the public API only)
+  __init__.py        convenient top-level exports; imports no Qt
+  version.py         the single version source
+  __main__.py        `python -m atica` -> GUI
+  core/              exceptions, precision, rounding, validation, results
+  units/             definitions (exact factors), registry, convert()
+  packaging/         hierarchy (PackagingLevel, Product), breakdown
+  materials/         material (BomItem, Bom, single material), bom (BOM + capacity)
+  production/        batches, time (time & capacity), capacity (batch capacity)
+  quality/           scrap, yields, wastage
+  purchasing/        calculations
+  integrations/      csv, excel (optional), shared row handling
+  gui/
+    app.py           main(): QApplication, logging, error hook, --check/--version
+    main_window.py   sidebar + stacked screens
+    models/          Field, Outcome, ResultTable (Qt-free)
+    services/        AppState (session), formatting, parsing, settings storage
+    controllers/     one module per domain: form text -> core API -> Outcome   (Qt-free, no maths)
+    components/      cards, banners, FormPanel, TableEditor, ResultPanel, Sidebar, CalculatorPanel
+    views/           the ten screens
+    styles/          design tokens (Theme) + stylesheet generator
+    resources/       SVG icons and logo
+    utils/           icon loader, error translation and logging
+tests/               core/ units/ packaging/ materials/ production/ quality/ purchasing/ integration/ gui/
 ```
 
-Dependency direction (no cycles): `exceptions` ← `calculations` ← `results` ← `units` ← `validation`/`packaging` ← `manufacturing`, `inventory` ← `io` ← `config`.
-`validation` modules depend only on `calculations` (and `units` for unit rules), so calculators can reuse them.
+## Design decisions
 
-## Principles
+* **Exact arithmetic.** Fractions inside, `Decimal` out, one rounding at the end (see [core.md](core.md)).
+* **Immutability.** `Product`, `Bom`, `BomItem`, `PackagingLevel` and all results are frozen; "changing" a product returns a new one. Calculations cannot mutate inputs.
+* **No shared mutable state.** The module-level `convert` uses a read-only default registry; custom units live in registries you own. Precision is a `ContextVar`.
+* **Fail loudly.** Invalid input raises a specific error with parameter and hint; nothing returns `0`, `None` or a guess.
+* **No dynamic execution, no network, no implicit files.** Tests assert the package contains no `eval`/`exec`/`pickle`/`subprocess`/`socket` and that the core imports only the standard library. Files are touched only by the explicit integration functions.
+* **Thread safety.** Results, products, BOMs and unit definitions are immutable, and precision is context-local, so calculations can run in parallel. The only mutable object, `UnitRegistry`, serialises *writes* (registering/removing units) with a lock; reads are not locked, so finish registering custom units before sharing a registry across threads (or give each thread its own `registry.copy()`). The shared default registry is read-only.
+* **Lazy Qt.** `import atica` and `import atica.gui` (models, services, controllers) never import PySide6; `atica.gui.app.main` imports it on demand and turns a broken Qt install into a readable message.
+* **Theming.** All colours are tokens in `gui/styles/theme.py::Theme`; a dark theme is another `Theme` instance.
 
-* **Own conversion engine.** `units` holds all physical knowledge. Nothing else converts physical units; `manufacturing` and `inventory` call `UnitRegistry.convert`.
-* **Packaging is not physics.** Packaging relationships live on a `Product`, never in the unit registry.
-* **Stateless core.** Everything works in memory. `AticaConfig` serialises to plain JSON (no pickle, nothing executable).
-* **One validation source.** Validators return a `ValidationResult`; calculators call them and `raise_if_invalid(ExcClass)`, so structured results and exceptions always agree.
-* **Isolation.** Custom units live in a `UnitRegistry` instance. The module-level functions in `atica.units` use a shared default registry for convenience; pass `registry=` (or use instances) for per-company isolation.
+## Complexity
 
-## Precision
-
-| Concept | Where |
-|---|---|
-| Calculation precision | 60 digits inside every arithmetic block (`calc_context`) |
-| Result precision | results cleaned to 28 significant digits to remove noise (`clean`), e.g. `5/9` |
-| Operational rounding | explicit `rounding=` / `places=` / `multiple=` arguments, per call |
-| Display precision | `CalculationResult.display(places)` / `format_quantity` - never changes the stored value |
-
-Floats are accepted but converted through `repr` (`0.1` stays `0.1`). `NaN`, infinities, booleans and absurd exponents are rejected.
-
-## Rounding policies (`RoundingPolicy`)
-
-| Policy | Behaviour |
-|---|---|
-| `none` | unchanged |
-| `half_up`, `half_even` | to `places` decimals |
-| `down`, `up` | floor / ceiling to `places` decimals (positive quantities: truncate / round up) |
-| `ceiling_package`, `floor_package` | to a whole multiple of `multiple` (package size) |
-| `preserve_remainder` | floor to whole packages; `round_with_remainder` also returns what was left over |
-
-## Error handling
-
-```
-AticaError
- ├ UnitError: UnknownUnitError, IncompatibleUnitError, InvalidConversionError
- ├ PackagingError: InvalidHierarchyError, UnknownProductError
- ├ ManufacturingError
- ├ InventoryError
- ├ ValidationError: InvalidQuantityError
- ├ BulkProcessingError
- └ ConfigurationError
-```
-
-The GUI turns these into readable messages and logs unexpected exceptions instead of showing stack traces.
-
-## Data models
-
-| Spec model | Class |
-|---|---|
-| Unit | `atica.units.Unit` (unit_id, name, symbol, category, base_unit, factor, offset, conversion_strategy, is_custom, metadata) |
-| Product | `atica.packaging.Product` |
-| Packaging level | `atica.packaging.PackagingLevel` (name = level_id, contains = quantity_per_parent, parent) |
-| Manufacturing material | `atica.manufacturing.Material` |
-| Purchasing configuration | `atica.inventory.PurchasingConfig` |
-
-## Security and reliability
-
-* No `eval`/`exec`; formulas use a hand-written parser with a small whitelist (length, depth and exponent limits).
-* Imports validate content: file size (50 MB) and row (100 000) limits, duplicate headers, encoding, malformed rows.
-* Exports never overwrite unless `overwrite=True`, and neutralise spreadsheet formula injection (`=`, `+`, `-`, `@` prefixes).
-* Failed updates (`update_unit`, `load_dict`, `AticaConfig.load`) leave the previous state untouched.
+Unit/packaging/BOM/production/quality/purchasing calls are O(1) in the quantity and O(n) in the number of BOM lines/levels (`Product` validates and indexes its chain once, on construction; lookups are O(1)). `convert` does a dictionary lookup and a handful of rational operations. `Bom` merging of duplicate lines is O(n). CSV conversion is a single pass, O(rows), reading the file once with a row and size cap.

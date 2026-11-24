@@ -2,157 +2,191 @@
 
 Conversion model
 ----------------
-Every unit stores a ``factor`` and an optional ``offset`` relative to its
-category's base unit::
+Each unit stores an exact ``factor`` and ``offset`` (both :class:`~fractions.Fraction`)
+relative to its category's base unit::
 
-    base   = (value + offset) * factor
-    value' = base / target.factor - target.offset
+    base  = (value + offset) * factor
+    value = base / factor - offset
 
-For ordinary units ``offset`` is 0, which gives the simple rule
-``base = value * factor`` / ``target = base / target_factor``. Temperature
-scales use a non-zero offset.
+Ordinary units have ``offset == 0``.  Temperature scales that do not start at
+absolute zero (Celsius, Fahrenheit) have a non-zero offset - they are *not*
+ordinary multiplicative units.
+
+All built-in factors are exact by definition (international yard and pound,
+US customary volumes, thermochemical calorie, standard gravity ...), so no
+approximate factors exist.  ``psi``, ``lbf``, ``hp`` and ``lbf-ft`` are derived
+exactly from those definitions rather than typed in as rounded decimals.
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from decimal import Decimal
-from typing import Any, Dict, List, Tuple
+from dataclasses import dataclass
+from fractions import Fraction
+from typing import Any, Dict, List, Optional, Tuple
 
-from ..calculations.numeric import calc_context, to_decimal
-from .categories import BASE_UNITS
+#: category -> symbol of its base unit
+BASE_UNITS: Dict[str, str] = {
+    "length": "m",
+    "mass": "g",
+    "area": "m2",
+    "volume": "L",
+    "temperature": "K",
+    "time": "s",
+    "count": "piece",
+    "pressure": "Pa",
+    "force": "N",
+    "speed": "m/s",
+    "power": "W",
+    "energy": "J",
+    "frequency": "Hz",
+    "torque": "Nm",
+    "voltage": "V",
+    "current": "A",
+    "resistance": "ohm",
+}
 
 
 @dataclass(frozen=True)
 class Unit:
-    unit_id: str
-    name: str
+    """A unit of measurement.
+
+    ``symbol`` is the canonical identifier (also what results report); ``aliases``
+    are other accepted spellings.  ``definition`` is ``(reference_symbol, ratio)`` for
+    custom units (``1 symbol = ratio reference``) and ``None`` for built-ins.
+    """
+
     symbol: str
+    name: str
     category: str
-    base_unit: str
-    factor: Decimal
-    offset: Decimal = Decimal(0)
-    conversion_strategy: str = "linear"  # "linear" | "offset"
-    is_custom: bool = False
+    factor: Fraction
+    offset: Fraction = Fraction(0)
     aliases: Tuple[str, ...] = ()
-    metadata: Dict[str, Any] = field(default_factory=dict, compare=False, hash=False)
+    custom: bool = False
+    definition: Optional[Tuple[str, Fraction]] = None
 
     @property
-    def exact(self) -> bool:
-        return bool(self.metadata.get("exact", True))
+    def is_offset(self) -> bool:
+        """True for scales with a zero offset different from the base unit's (Celsius, Fahrenheit)."""
+        return self.offset != 0
 
 
-# (id, name, symbol, category, factor-to-base, aliases, exact?)
-_L = "length"
-_STANDARD = [
-    # length (base: m)
-    ("mm", "Millimetre", "mm", _L, "0.001", ("millimeter",), True),
-    ("cm", "Centimetre", "cm", _L, "0.01", ("centimeter",), True),
-    ("m", "Metre", "m", _L, "1", ("meter", "metre"), True),
-    ("km", "Kilometre", "km", _L, "1000", ("kilometer",), True),
-    ("inch", "Inch", "in", _L, "0.0254", ("in", "inches"), True),
-    ("foot", "Foot", "ft", _L, "0.3048", ("ft", "feet"), True),
-    ("yard", "Yard", "yd", _L, "0.9144", ("yd", "yards"), True),
-    ("mile", "Mile", "mi", _L, "1609.344", ("mi", "miles"), True),
-    # mass (base: g)
-    ("mg", "Milligram", "mg", "mass", "0.001", ("milligram",), True),
-    ("g", "Gram", "g", "mass", "1", ("gram",), True),
-    ("kg", "Kilogram", "kg", "mass", "1000", ("kilogram",), True),
-    ("tonne", "Tonne", "t", "mass", "1000000", ("t", "metric_ton"), True),
-    ("pound", "Pound", "lb", "mass", "453.59237", ("lb", "lbs", "pounds"), True),
-    ("ounce", "Ounce", "oz", "mass", "28.349523125", ("oz", "ounces"), True),
-    # area (base: m2)
-    ("mm2", "Square millimetre", "mm²", "area", "0.000001", ("mm²",), True),
-    ("cm2", "Square centimetre", "cm²", "area", "0.0001", ("cm²",), True),
-    ("m2", "Square metre", "m²", "area", "1", ("m²",), True),
-    ("hectare", "Hectare", "ha", "area", "10000", ("ha",), True),
-    ("ft2", "Square foot", "ft²", "area", "0.09290304", ("ft²", "sqft"), True),
-    ("acre", "Acre", "ac", "area", "4046.8564224", ("ac", "acres"), True),
-    # volume (base: litre)
-    ("ml", "Millilitre", "mL", "volume", "0.001", ("mL", "milliliter"), True),
-    ("litre", "Litre", "L", "volume", "1", ("l", "L", "liter"), True),
-    ("m3", "Cubic metre", "m³", "volume", "1000", ("m³",), True),
-    ("gallon", "US gallon", "gal", "volume", "3.785411784", ("gal", "gallons"), True),
-    ("pint", "US pint", "pt", "volume", "0.473176473", ("pt", "pints"), True),
-    ("floz", "US fluid ounce", "fl oz", "volume", "0.0295735295625", ("fl_oz",), True),
-    # temperature (base: kelvin). base = (value + offset) * factor
-    ("celsius", "Celsius", "°C", "temperature", "1", ("C", "degC", "°C"), True),
-    ("fahrenheit", "Fahrenheit", "°F", "temperature", "5/9", ("F", "degF", "°F"), True),
-    ("kelvin", "Kelvin", "K", "temperature", "1", ("K",), True),
-    # time (base: second)
-    ("second", "Second", "s", "time", "1", ("s", "sec"), True),
-    ("minute", "Minute", "min", "time", "60", ("min",), True),
-    ("hour", "Hour", "h", "time", "3600", ("h", "hr"), True),
-    ("day", "Day", "d", "time", "86400", ("d",), True),
-    # pressure (base: Pa)
-    ("Pa", "Pascal", "Pa", "pressure", "1", ("pascal",), True),
-    ("kPa", "Kilopascal", "kPa", "pressure", "1000", (), True),
-    ("MPa", "Megapascal", "MPa", "pressure", "1000000", (), True),
-    ("bar", "Bar", "bar", "pressure", "100000", (), True),
-    ("psi", "Pound-force per square inch", "psi", "pressure", "6894.757293168361", ("PSI",), False),
-    ("atm", "Standard atmosphere", "atm", "pressure", "101325", ("atmosphere",), True),
-    # force (base: N)
-    ("N", "Newton", "N", "force", "1", ("newton",), True),
-    ("kN", "Kilonewton", "kN", "force", "1000", (), True),
-    ("lbf", "Pound-force", "lbf", "force", "4.4482216152605", (), True),
-    # speed (base: m/s)
-    ("m/s", "Metre per second", "m/s", "speed", "1", ("mps",), True),
-    ("km/h", "Kilometre per hour", "km/h", "speed", "5/18", ("kph", "kmh"), True),
-    ("mph", "Mile per hour", "mph", "speed", "0.44704", (), True),
-    # power (base: W)
-    ("W", "Watt", "W", "power", "1", ("watt",), True),
-    ("kW", "Kilowatt", "kW", "power", "1000", (), True),
-    ("MW", "Megawatt", "MW", "power", "1000000", (), True),
-    ("hp", "Mechanical horsepower", "hp", "power", "745.69987158227022", ("horsepower",), False),
-    # energy (base: J)
-    ("J", "Joule", "J", "energy", "1", ("joule",), True),
-    ("kJ", "Kilojoule", "kJ", "energy", "1000", (), True),
-    ("kWh", "Kilowatt-hour", "kWh", "energy", "3600000", (), True),
-    ("cal", "Calorie (thermochemical)", "cal", "energy", "4.184", ("calorie",), True),
-    # frequency (base: Hz)
-    ("Hz", "Hertz", "Hz", "frequency", "1", ("hertz",), True),
-    ("kHz", "Kilohertz", "kHz", "frequency", "1000", (), True),
-    ("MHz", "Megahertz", "MHz", "frequency", "1000000", (), True),
-    # electrical
-    ("V", "Volt", "V", "voltage", "1", ("volt",), True),
-    ("mV", "Millivolt", "mV", "voltage", "0.001", (), True),
-    ("kV", "Kilovolt", "kV", "voltage", "1000", (), True),
-    ("A", "Ampere", "A", "current", "1", ("amp", "ampere"), True),
-    ("mA", "Milliampere", "mA", "current", "0.001", (), True),
-    ("kA", "Kiloampere", "kA", "current", "1000", (), True),
-    ("ohm", "Ohm", "Ω", "resistance", "1", ("Ohm", "Ω"), True),
-    ("kohm", "Kilohm", "kΩ", "resistance", "1000", ("kOhm", "kΩ"), True),
-    ("Mohm", "Megohm", "MΩ", "resistance", "1000000", ("MOhm", "MΩ"), True),
-    # torque (base: Nm)
-    ("Nm", "Newton metre", "N·m", "torque", "1", ("N.m", "N·m"), True),
-    ("lb-ft", "Pound-foot", "lb·ft", "torque", "1.3558179483314004", ("lbft", "lb.ft"), False),
+F = Fraction
+
+# derived exactly from definitions
+_FT = F("0.3048")
+_IN = F("0.0254")
+_LB = F("453.59237")  # g
+_G0 = F("9.80665")  # m/s^2 (standard gravity)
+_LBF = F("0.45359237") * _G0  # N
+
+# (symbol, name, category, factor, aliases[, offset])
+_TABLE: List[Tuple[Any, ...]] = [
+    # ---- length (base m)
+    ("mm", "Millimetre", "length", F("0.001"), ("millimeter", "millimetre")),
+    ("cm", "Centimetre", "length", F("0.01"), ("centimeter", "centimetre")),
+    ("m", "Metre", "length", F(1), ("meter", "metre")),
+    ("km", "Kilometre", "length", F(1000), ("kilometer", "kilometre")),
+    ("um", "Micrometre", "length", F("0.000001"), ("µm", "micron", "micrometer", "micrometre")),
+    ("in", "Inch", "length", _IN, ("inch", "inches")),
+    ("ft", "Foot", "length", _FT, ("foot", "feet")),
+    ("yd", "Yard", "length", F("0.9144"), ("yard", "yards")),
+    ("mi", "Mile", "length", F("1609.344"), ("mile", "miles")),
+    # ---- mass (base g)
+    ("mg", "Milligram", "mass", F("0.001"), ("milligram",)),
+    ("g", "Gram", "mass", F(1), ("gram", "grams")),
+    ("kg", "Kilogram", "mass", F(1000), ("kilogram", "kilograms")),
+    ("t", "Tonne (metric ton)", "mass", F(1_000_000), ("tonne", "tonnes", "metric_ton")),
+    ("lb", "Pound", "mass", _LB, ("pound", "pounds", "lbs")),
+    ("oz", "Ounce", "mass", _LB / 16, ("ounce", "ounces")),
+    # ---- area (base m2)
+    ("mm2", "Square millimetre", "area", F("0.000001"), ("mm²",)),
+    ("cm2", "Square centimetre", "area", F("0.0001"), ("cm²",)),
+    ("m2", "Square metre", "area", F(1), ("m²",)),
+    ("km2", "Square kilometre", "area", F(1_000_000), ("km²",)),
+    ("ha", "Hectare", "area", F(10_000), ("hectare", "hectares")),
+    ("in2", "Square inch", "area", _IN * _IN, ("in²", "sqin")),
+    ("ft2", "Square foot", "area", _FT * _FT, ("ft²", "sqft")),
+    ("acre", "Acre", "area", F(43_560) * _FT * _FT, ("ac", "acres")),
+    # ---- volume (base litre)
+    ("mL", "Millilitre", "volume", F("0.001"), ("ml", "milliliter", "millilitre", "cm3", "cm³", "cc")),
+    ("L", "Litre", "volume", F(1), ("l", "litre", "liter", "litres", "liters")),
+    ("m3", "Cubic metre", "volume", F(1000), ("m³",)),
+    ("gal", "US gallon", "volume", F(231) * _IN**3 * 1000, ("gallon", "gallons", "us_gal")),
+    ("qt", "US quart", "volume", F(231) * _IN**3 * 1000 / 4, ("quart", "quarts")),
+    ("pt", "US pint", "volume", F(231) * _IN**3 * 1000 / 8, ("pint", "pints")),
+    ("fl_oz", "US fluid ounce", "volume", F(231) * _IN**3 * 1000 / 128, ("floz", "fl oz")),
+    # ---- temperature (base K): K = (value + offset) * factor
+    ("K", "Kelvin", "temperature", F(1), ("kelvin",), F(0)),
+    ("C", "Celsius", "temperature", F(1), ("celsius", "degC", "°C"), F("273.15")),
+    ("F", "Fahrenheit", "temperature", F(5, 9), ("fahrenheit", "degF", "°F"), F("459.67")),
+    ("R", "Rankine", "temperature", F(5, 9), ("rankine", "degR", "°R"), F(0)),
+    # ---- time (base s)
+    ("ms", "Millisecond", "time", F("0.001"), ("millisecond", "milliseconds")),
+    ("s", "Second", "time", F(1), ("sec", "second", "seconds")),
+    ("min", "Minute", "time", F(60), ("minute", "minutes")),
+    ("h", "Hour", "time", F(3600), ("hr", "hour", "hours")),
+    ("d", "Day", "time", F(86_400), ("day", "days")),
+    ("wk", "Week", "time", F(604_800), ("week", "weeks")),
+    # ---- count (base piece)
+    ("piece", "Piece", "count", F(1), ("pc", "pcs", "pieces", "each", "ea")),
+    ("pair", "Pair", "count", F(2), ("pairs",)),
+    ("dozen", "Dozen", "count", F(12), ("doz",)),
+    ("gross", "Gross", "count", F(144), ()),
+    # ---- pressure (base Pa)
+    ("Pa", "Pascal", "pressure", F(1), ("pascal",)),
+    ("kPa", "Kilopascal", "pressure", F(1000), ()),
+    ("MPa", "Megapascal", "pressure", F(1_000_000), ()),
+    ("bar", "Bar", "pressure", F(100_000), ()),
+    ("psi", "Pound-force per square inch", "pressure", _LBF / (_IN * _IN), ("PSI",)),
+    ("atm", "Standard atmosphere", "pressure", F(101_325), ("atmosphere",)),
+    # ---- force (base N)
+    ("N", "Newton", "force", F(1), ("newton",)),
+    ("kN", "Kilonewton", "force", F(1000), ()),
+    ("lbf", "Pound-force", "force", _LBF, ()),
+    ("kgf", "Kilogram-force", "force", _G0, ()),
+    # ---- speed (base m/s)
+    ("m/s", "Metre per second", "speed", F(1), ("mps",)),
+    ("km/h", "Kilometre per hour", "speed", F(5, 18), ("kph", "kmh")),
+    ("mph", "Mile per hour", "speed", F(1609344, 1000 * 3600), ()),
+    ("ft/s", "Foot per second", "speed", _FT, ("fps",)),
+    # ---- power (base W)
+    ("W", "Watt", "power", F(1), ("watt",)),
+    ("kW", "Kilowatt", "power", F(1000), ()),
+    ("MW", "Megawatt", "power", F(1_000_000), ()),
+    ("hp", "Mechanical horsepower", "power", 550 * _FT * _LBF, ("horsepower",)),
+    # ---- energy (base J)
+    ("J", "Joule", "energy", F(1), ("joule",)),
+    ("kJ", "Kilojoule", "energy", F(1000), ()),
+    ("MJ", "Megajoule", "energy", F(1_000_000), ()),
+    ("kWh", "Kilowatt-hour", "energy", F(3_600_000), ()),
+    ("cal", "Calorie (thermochemical)", "energy", F("4.184"), ("calorie",)),
+    ("kcal", "Kilocalorie (thermochemical)", "energy", F("4184"), ("kilocalorie",)),
+    # ---- frequency (base Hz)
+    ("Hz", "Hertz", "frequency", F(1), ("hertz",)),
+    ("kHz", "Kilohertz", "frequency", F(1000), ()),
+    ("MHz", "Megahertz", "frequency", F(1_000_000), ()),
+    ("rpm", "Revolutions per minute", "frequency", F(1, 60), ()),
+    # ---- torque (base N*m)
+    ("Nm", "Newton metre", "torque", F(1), ("N.m", "N·m")),
+    ("lbf-ft", "Pound-force foot", "torque", _FT * _LBF, ("lb-ft", "lbft", "lb.ft", "lb·ft")),
+    # ---- electrical
+    ("V", "Volt", "voltage", F(1), ("volt",)),
+    ("mV", "Millivolt", "voltage", F("0.001"), ()),
+    ("kV", "Kilovolt", "voltage", F(1000), ()),
+    ("A", "Ampere", "current", F(1), ("amp", "ampere")),
+    ("mA", "Milliampere", "current", F("0.001"), ()),
+    ("kA", "Kiloampere", "current", F(1000), ()),
+    ("ohm", "Ohm", "resistance", F(1), ("Ω",)),
+    ("kohm", "Kilohm", "resistance", F(1000), ("kΩ",)),
+    ("Mohm", "Megohm", "resistance", F(1_000_000), ("MΩ",)),
 ]
 
-_OFFSETS = {"celsius": "273.15", "fahrenheit": "459.67"}
 
-
-def build_standard_units() -> List[Unit]:
-    """Create the built-in :class:`Unit` objects."""
+def standard_units() -> Tuple[Unit, ...]:
+    """Build the immutable tuple of built-in units."""
     units = []
-    for uid, name, symbol, category, factor, aliases, exact in _STANDARD:
-        offset = Decimal(_OFFSETS.get(uid, "0"))
-        units.append(
-            Unit(
-                unit_id=uid,
-                name=name,
-                symbol=symbol,
-                category=category,
-                base_unit=BASE_UNITS[category],
-                factor=to_decimal(factor, field="factor", allow_fraction=True),
-                offset=offset,
-                conversion_strategy="offset" if offset != 0 else "linear",
-                is_custom=False,
-                aliases=tuple(aliases),
-                metadata={"exact": exact},
-            )
-        )
-    return units
-
-
-def scale(a: Decimal, b: Decimal) -> Decimal:
-    with calc_context():
-        return a * b
+    for row in _TABLE:
+        symbol, name, category, factor, aliases = row[:5]
+        offset = row[5] if len(row) > 5 else F(0)
+        units.append(Unit(symbol, name, category, factor, offset, tuple(aliases)))
+    return tuple(units)
