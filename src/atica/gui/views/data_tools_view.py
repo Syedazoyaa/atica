@@ -32,8 +32,14 @@ _EXCEL = importlib.util.find_spec("openpyxl") is not None
 
 
 def _file_filter(kind: str) -> str:
+    """Files that can be **read**: CSV and Excel workbooks (``.xlsm`` is read, never written)."""
     base = "*.csv *.xlsx *.xlsm" if _EXCEL else "*.csv"
     return "%s (%s)" % (kind, base)
+
+
+def _export_filter() -> str:
+    """Files that can be **written**: CSV, and ``.xlsx`` when openpyxl is installed (no macro-enabled workbooks)."""
+    return "CSV file (*.csv);;Excel workbook (*.xlsx)" if _EXCEL else "CSV file (*.csv)"
 
 
 class DataToolsView(ToolView):
@@ -46,8 +52,8 @@ class DataToolsView(ToolView):
         )
         self._report: Optional[ConversionReport] = None
         self._path: Optional[str] = None
-        self.add_tab("Convert a file", self._build_convert())
-        self.add_tab("Import a BOM", self._build_bom())
+        self.add_scrolling_tab("Convert a file", self._build_convert())
+        self.add_scrolling_tab("Import a BOM", self._build_bom())
 
     # --------------------------------------------------------------- converter
     def _build_convert(self) -> QWidget:
@@ -57,7 +63,7 @@ class DataToolsView(ToolView):
         )
         self._file_label = label("No file chosen.", "muted", wrap=True)
         choose = QPushButton(" Choose file…")
-        choose.setIcon(icon("folder", "#102B50", 16))
+        choose.setIcon(icon("folder", size=16))
         choose.clicked.connect(self._choose_convert)
         self._form = FormPanel(rounding_fields(), self.state)
         self._convert_button = QPushButton("Convert file")
@@ -72,10 +78,10 @@ class DataToolsView(ToolView):
         self._table.verticalHeader().setVisible(False)
         self._table.setMinimumHeight(220)
         self._export_results = QPushButton(" Export converted rows…")
-        self._export_results.setIcon(icon("export", "#102B50", 16))
+        self._export_results.setIcon(icon("export", size=16))
         self._export_results.clicked.connect(lambda: self._export(errors=False))
         self._export_errors = QPushButton(" Export problem rows…")
-        self._export_errors.setIcon(icon("export", "#102B50", 16))
+        self._export_errors.setIcon(icon("export", size=16))
         self._export_errors.clicked.connect(lambda: self._export(errors=True))
         for b in (self._export_results, self._export_errors):
             b.setEnabled(False)
@@ -139,8 +145,8 @@ class DataToolsView(ToolView):
         self._table.setRowCount(report.succeeded + report.failed)
         self._table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         r = 0
-        for i, data in enumerate(report.rows, start=1):
-            self._table.setItem(r, 0, QTableWidgetItem(str(i)))
+        for number, data in zip(report.row_numbers, report.rows):  # real source row numbers
+            self._table.setItem(r, 0, QTableWidgetItem(str(number)))
             self._table.setItem(r, 1, QTableWidgetItem("Converted"))
             for c, name in enumerate(report.fieldnames):
                 self._table.setItem(r, 2 + c, QTableWidgetItem(data.get(name, "")))
@@ -166,13 +172,13 @@ class DataToolsView(ToolView):
         report = self._report
         if report is None:
             return
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Export", "atica-errors" if errors else "atica-converted", _file_filter("Data files")
+        path, chosen = QFileDialog.getSaveFileName(
+            self, "Export", "atica-errors" if errors else "atica-converted", _export_filter()
         )
         if not path:
             return
         if not os.path.splitext(path)[1]:
-            path += ".csv"
+            path += ".xlsx" if "xlsx" in chosen else ".csv"
         fn = data_tools.export_errors if errors else data_tools.export_report
         saved, err = guard(
             lambda: fn(report, path, overwrite=True)
@@ -190,7 +196,7 @@ class DataToolsView(ToolView):
             "Columns needed: material_id, quantity_per_unit, unit. Optional: wastage_percent, name. The imported BOM is used on the Materials and BOM and Production screens.",
         )
         choose = QPushButton(" Choose BOM file…")
-        choose.setIcon(icon("folder", "#102B50", 16))
+        choose.setIcon(icon("folder", size=16))
         choose.clicked.connect(self._choose_bom)
         self._bom_error = Banner("error")
         self._bom_ok = Banner("success")

@@ -11,10 +11,11 @@ from typing import Any, List, Mapping, Optional, Tuple
 from ..core.exceptions import ConstraintError, InvalidConfigurationError
 from ..core.precision import dec
 from ..core.results import Result
-from ..core.rounding import PackageRounding, Rounding
-from ..core.validation import non_negative, positive
-from ..materials import Bom, BomRequirements, calculate_bom_requirements
-from ..units import UnitRegistry
+from ..core.rounding import PackageRounding, Rounding, resolve_rounding
+from ..core.validation import non_negative, percentage, positive
+from ..materials import Bom, BomRequirements, MaterialRequirement
+from ..materials.bom import _check_overrides, _compute
+from ..units import UnitRegistry, default_registry
 
 
 @dataclass(frozen=True)
@@ -119,34 +120,42 @@ def calculate_batch_materials(
     >>> str(plan.materials[0].total)
     '500'
     """
-    batches = calculate_batches(quantity, batch_size)
-    kwargs = {
-        "scrap_percent": scrap_percent,
-        "rounding": rounding,
-        "places": places,
-        "report_units": report_units,
-        "registry": registry,
-    }
-    per_full = calculate_bom_requirements(bom, batches.batch_size, **kwargs)
-    partial = (
-        calculate_bom_requirements(bom, batches.partial_batch_quantity, **kwargs)
-        if batches.has_partial_batch
-        else None
+    reg = registry or default_registry()
+    q = non_negative(quantity, "quantity")
+    size = positive(batch_size, "batch_size")
+    scrap = percentage(scrap_percent, "scrap_percent", allow_100=False)
+    policy, places = resolve_rounding(rounding, places)
+    overrides = _check_overrides(bom, report_units)
+    batches = calculate_batches(q, size)
+    full_n = Fraction(math.floor(q / size))
+    partial_q = q - full_n * size
+
+    def one_batch(good: Fraction) -> Tuple[BomRequirements, List[Fraction]]:
+        lines, totals, exact = _compute(bom, good, scrap, policy, places, overrides, reg)
+        result = BomRequirements(bom.product_id, dec(good), dec(scrap), tuple(lines), tuple(totals))
+        return result, exact
+
+    per_full, exact_full = one_batch(size)
+    partial, exact_partial = (
+        one_batch(partial_q) if partial_q > 0 else (None, [Fraction(0)] * len(exact_full))
     )
-    full_n = Fraction(batches.full_batches)
+
+    def issued(requirement: MaterialRequirement, exact: Fraction) -> Fraction:
+        # what is actually issued: the rounded figure (an exact decimal), or the exact fraction if unrounded
+        return exact if policy is Rounding.NONE else Fraction(requirement.quantity)
+
     rows: List[BatchMaterial] = []
     for i, full_line in enumerate(per_full.totals):
-        part_line = partial.totals[i] if partial else None
-        part_qty = Fraction(part_line.quantity) if part_line else Fraction(0)
-        part_exact = Fraction(part_line.exact_quantity) if part_line else Fraction(0)
+        issued_full = issued(full_line, exact_full[i])
+        issued_partial = issued(partial.totals[i], exact_partial[i]) if partial else Fraction(0)
         rows.append(
             BatchMaterial(
                 material_id=full_line.material_id,
                 unit=full_line.unit,
                 per_full_batch=full_line.quantity,
-                partial_batch=dec(part_qty),
-                total=dec(full_n * Fraction(full_line.quantity) + part_qty),
-                exact_total=dec(full_n * Fraction(full_line.exact_quantity) + part_exact),
+                partial_batch=dec(issued_partial),
+                total=dec(full_n * issued_full + issued_partial),
+                exact_total=dec(full_n * exact_full[i] + exact_partial[i]),
             )
         )
     return BatchMaterialPlan(

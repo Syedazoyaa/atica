@@ -61,7 +61,7 @@ def import_bom(path: str, state: AppState) -> Outcome:
     """Load a BOM file and make it the session BOM used by the Materials and Production screens."""
     bom = excel_io.read_bom_xlsx(path) if _is_excel(path) else csv_io.read_bom_csv(path)
     rows: List[List[str]] = [
-        [i.material_id, format(i.quantity_per_unit, "f"), i.unit, format(i.wastage_percent, "f")]
+        [i.material_id, format(i.quantity_per_unit, "f"), i.unit, format(i.wastage_percent, "f"), i.name]
         for i in bom.items
     ]
     state.bom_rows = rows

@@ -46,14 +46,17 @@ def build_product(product_id: str, name: str, rows: Sequence[Sequence[str]]) -> 
 
 
 def build_bom(rows: Sequence[Sequence[str]], *, allow_duplicates: bool = False) -> Bom:
-    """``rows`` are ``[material id, quantity per unit, unit, wastage %]``; blank rows are ignored."""
+    """``rows`` are ``[material id, quantity per unit, unit, wastage %, name]``; blank rows are ignored.
+
+    The wastage and name cells are optional.
+    """
     items: List[BomItem] = []
     for index, row in enumerate(rows, start=1):
-        cells = [(c or "").strip() for c in ([*list(row), "", "", "", ""])[:4]]
+        cells = [(c or "").strip() for c in ([*list(row), "", "", "", "", ""])[:5]]
         if not any(cells):
             continue
         try:
-            items.append(BomItem(cells[0], cells[1], cells[2], cells[3] or "0"))
+            items.append(BomItem(cells[0], cells[1], cells[2], cells[3] or "0", cells[4]))
         except AticaError as exc:
             exc.message = "BOM row %d: %s" % (index, exc.message)
             raise

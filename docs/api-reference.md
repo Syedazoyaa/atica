@@ -964,11 +964,14 @@ Load a BOM from a sheet (see :func:`atica.integrations.csv.read_bom_csv` for the
 
 ## Integrations (shared) - `atica.integrations`
 
-### class `ConversionReport(fieldnames: 'Tuple[str, ...]', rows: 'Tuple[Row, ...]', errors: 'Tuple[RowError, ...]' = (), total_rows: 'int' = 0) -> None`
+### class `ConversionReport(fieldnames: 'Tuple[str, ...]', rows: 'Tuple[Row, ...]', errors: 'Tuple[RowError, ...]' = (), total_rows: 'int' = 0, row_numbers: 'Tuple[int, ...]' = ()) -> None`
 
 Outcome of converting many rows: converted rows (original columns + result columns) and errors.
 
-Fields: `fieldnames`, `rows`, `errors`, `total_rows`
+``row_numbers[i]`` is the position **in the source file** (CSV line / Excel row) of ``rows[i]``;
+every :class:`RowError` carries its source row number too.
+
+Fields: `fieldnames`, `rows`, `errors`, `total_rows`, `row_numbers`
 
 ### class `RowError(row_number: 'int', message: 'str', code: 'str' = '', hint: 'Optional[str]' = None) -> None`
 
@@ -976,7 +979,7 @@ A problem found in one row (``row_number`` is the position in the source file).
 
 Fields: `row_number`, `message`, `code`, `hint`
 
-### `bom_from_rows(rows: 'Sequence[Mapping[str, Any]]', *, product_id: 'str' = '', allow_duplicates: 'bool' = False) -> 'Bom'`
+### `bom_from_rows(rows: 'Sequence[Mapping[str, Any]]', *, product_id: 'str' = '', allow_duplicates: 'bool' = False, row_numbers: 'Optional[Sequence[int]]' = None) -> 'Bom'`
 
 Build a :class:`~atica.materials.Bom` from rows with ``material_id, quantity_per_unit, unit``
 (optional ``wastage_percent`` and ``name``).  Any invalid row raises with its row number.

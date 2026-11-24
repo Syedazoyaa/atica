@@ -37,6 +37,7 @@ def create_application(argv: Optional[Sequence[str]] = None) -> QApplication:
     from PySide6.QtWidgets import QApplication
 
     from .styles import LIGHT, build_stylesheet
+    from .utils.fonts import apply_application_font, register_fonts
     from .utils.icons import logo_pixmap
 
     QCoreApplication.setOrganizationName("ATICA")
@@ -44,6 +45,9 @@ def create_application(argv: Optional[Sequence[str]] = None) -> QApplication:
     QCoreApplication.setApplicationVersion(__version__)
     app = QApplication.instance() or QApplication(list(argv) if argv is not None else sys.argv)
     assert isinstance(app, QApplication)
+    # IBM Plex Sans ships inside the package: register it before the stylesheet names it
+    app.setProperty("atica.fonts_loaded", register_fonts())
+    apply_application_font(app)
     app.setStyleSheet(build_stylesheet(LIGHT))
     app.setWindowIcon(QIcon(logo_pixmap(64)))
     return app
@@ -107,6 +111,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     try:
         app = create_application(["atica-gui"])
         _setup_logging()
+        if not app.property("atica.fonts_loaded"):
+            from .utils.errors import LOG
+
+            LOG.warning("The bundled IBM Plex Sans font could not be loaded; using a system font.")
         _install_excepthook()
         window = build_window()
         window.show()

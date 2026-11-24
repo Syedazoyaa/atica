@@ -13,6 +13,7 @@ from ._rows import (
     ConversionReport,
     Row,
     bom_from_rows,
+    check_cells_have_headers,
     check_headers,
     check_input_path,
     check_output_path,
@@ -33,6 +34,13 @@ def _openpyxl() -> Any:
     return openpyxl
 
 
+def _illegal_character_error() -> Any:
+    """openpyxl's ``IllegalCharacterError`` (it is not a ``ValueError`` subclass)."""
+    from openpyxl.utils.exceptions import IllegalCharacterError
+
+    return IllegalCharacterError
+
+
 def _text(value: Any) -> str:
     if value is None:
         return ""
@@ -41,6 +49,26 @@ def _text(value: Any) -> str:
     if isinstance(value, (datetime.date, datetime.datetime)):
         return value.isoformat()
     return str(value).strip()
+
+
+_BAD_SHEET_CHARS = set("[]:*?/\\")
+
+
+def _check_sheet_name(name: Any) -> None:
+    """Excel sheet names: 1-31 characters, none of the characters ``[ ] : * ? /`` or backslash, not starting/ending with an apostrophe."""
+    if (
+        not isinstance(name, str)
+        or not name.strip()
+        or len(name) > 31
+        or _BAD_SHEET_CHARS & set(name)
+        or name.startswith("'")
+        or name.endswith("'")
+    ):
+        raise IntegrationError(
+            "%r is not a valid Excel worksheet name." % (name,),
+            parameter="sheet_name",
+            hint="Use 1-31 characters without any of [ ] : * ? / or backslash (and no leading/trailing apostrophe).",
+        )
 
 
 def read_xlsx(
@@ -76,7 +104,8 @@ def read_xlsx(
                 continue
             if len(rows) >= max_rows:
                 raise IntegrationError("More than %d data rows." % max_rows, parameter="path")
-            rows.append({h: (cells[i] if i < len(cells) else "") for i, h in enumerate(fieldnames)})
+            check_cells_have_headers(cells, fieldnames, number)
+            rows.append({h: (cells[i] if i < len(cells) else "") for i, h in enumerate(fieldnames) if h})
             numbers.append(number)
     finally:
         book.close()
@@ -95,17 +124,29 @@ def write_xlsx(
 ) -> str:
     """Write ``rows`` to an .xlsx file and return the path."""
     p = check_output_path(path, (".xlsx",), overwrite)
+    _check_sheet_name(sheet_name)
     openpyxl = _openpyxl()
     book = openpyxl.Workbook()
     sheet = book.active
-    sheet.title = sheet_name[:31]
-    sheet.append(list(fieldnames))
-    for row in rows:
-        sheet.append([sanitize_cell(row.get(f, "")) for f in fieldnames])
+    sheet.title = sheet_name
+    try:
+        sheet.append(list(fieldnames))
+        for row in rows:
+            sheet.append([sanitize_cell(row.get(f, "")) for f in fieldnames])
+    except (ValueError, _illegal_character_error()) as exc:  # e.g. control characters Excel cannot store
+        raise IntegrationError(
+            "A value cannot be stored in an Excel sheet: %s" % exc,
+            parameter="rows",
+            hint="Remove control characters from the data or export to CSV instead.",
+        ) from None
     try:
         book.save(p)
     except OSError as exc:
-        raise IntegrationError("Cannot write the file: %s" % exc, parameter="path") from None
+        raise IntegrationError(
+            "Cannot write the file: %s" % exc,
+            parameter="path",
+            hint="Check that the folder is writable and that the file is not open in Excel.",
+        ) from None
     return p
 
 
@@ -130,5 +171,5 @@ def read_bom_xlsx(
     path: Any, *, sheet: Optional[str] = None, product_id: str = "", allow_duplicates: bool = False
 ) -> Bom:
     """Load a BOM from a sheet (see :func:`atica.integrations.csv.read_bom_csv` for the columns)."""
-    _, rows, _ = read_xlsx(path, sheet=sheet)
-    return bom_from_rows(rows, product_id=product_id, allow_duplicates=allow_duplicates)
+    _, rows, numbers = read_xlsx(path, sheet=sheet)
+    return bom_from_rows(rows, product_id=product_id, allow_duplicates=allow_duplicates, row_numbers=numbers)

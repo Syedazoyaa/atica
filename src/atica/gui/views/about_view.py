@@ -12,13 +12,14 @@ from atica.version import __version__
 
 from ..components import Card, label
 from ..services import AppState
-from ..utils.icons import logo_pixmap
+from ..utils.fonts import fonts_available
+from ..utils.icons import wordmark_pixmap
 from .base import ToolView
 
 _SNIPPET = """from atica.units import convert
 from atica.packaging import Product, PackagingLevel, breakdown
 
-print(convert(25, "kg", "g"))          # 25000 g
+print(convert(25, "kg", "g"))
 
 product = Product("P001", "Product A", levels=[
     PackagingLevel("piece"),
@@ -39,20 +40,21 @@ class AboutView(ToolView):
         )
         head = Card()
         row = QHBoxLayout()
+        row.setSpacing(18)
         mark = QLabel()
-        mark.setPixmap(logo_pixmap(64))
-        mark.setFixedSize(64, 64)
+        mark.setPixmap(wordmark_pixmap(44))
+        mark.setAccessibleName("ATICA")
         text = QVBoxLayout()
-        text.addWidget(label("ATICA " + __version__, "cardTitle"))
+        text.addWidget(label("Version " + __version__, "cardTitle"))
         text.addWidget(
             label(
-                "One package, two ways to work: the calculation library you import in Python, and this desktop application. "
-                "Both use exactly the same calculation code and the same version.",
+                "One package, two ways to work: the calculation library you import in Python, and this desktop "
+                "application. Both use exactly the same calculation code and the same version.",
                 "muted",
                 wrap=True,
             )
         )
-        row.addWidget(mark)
+        row.addWidget(mark, 0)
         row.addLayout(text, 1)
         head.body.addLayout(row)
 
@@ -62,28 +64,41 @@ class AboutView(ToolView):
             ("Python", platform.python_version()),
             ("PySide6 / Qt", PySide6.__version__),
             ("Platform", platform.platform()),
-            ("License", "MIT"),
+            (
+                "Interface typeface",
+                "IBM Plex Sans" + ("" if fonts_available() else " (not loaded, using a system font)"),
+            ),
         ):
             line = QHBoxLayout()
             line.addWidget(label(name, "muted"))
             line.addStretch(1)
-            line.addWidget(label(value, "fieldLabel"))
+            line.addWidget(label(value, "value"))
             facts.body.addLayout(line)
+
+        licences = Card("Licences")
+        licences.body.addWidget(label("ATICA is released under the MIT License.", "muted", wrap=True))
+        licences.body.addWidget(
+            label(
+                "The interface typeface is IBM Plex Sans, © 2017 IBM Corp. with Reserved Font Name “Plex”, "
+                "bundled unmodified under the SIL Open Font License 1.1 (see THIRD_PARTY_NOTICES.md and "
+                "atica/gui/resources/fonts/OFL.txt). The GUI is built with Qt for Python (PySide6).",
+                "muted",
+                wrap=True,
+            )
+        )
 
         use = Card("Use the same calculations from Python")
         code = QPlainTextEdit(_SNIPPET)
         code.setReadOnly(True)
-        code.setStyleSheet(
-            'QPlainTextEdit { font-family: "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace; font-size: 12px; }'
-        )
-        code.setFixedHeight(220)
+        code.setFixedHeight(250)
+        code.setAccessibleName("Python example")
         use.body.addWidget(code)
 
         holder = QWidget()
         lay = QVBoxLayout(holder)
-        lay.setContentsMargins(2, 2, 2, 14)
-        lay.setSpacing(14)
-        for card in (head, facts, use):
+        lay.setContentsMargins(0, 2, 8, 14)
+        lay.setSpacing(12)
+        for card in (head, facts, use, licences):
             lay.addWidget(card)
         lay.addStretch(1)
-        self.add_tab("About", holder)
+        self.add_scrolling_tab("About", holder)

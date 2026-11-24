@@ -162,6 +162,23 @@ class ReworkProjection(Result):
     warnings: Tuple[str, ...] = ()
 
 
+def _rework_rates(
+    first_pass_yield_percent: Any, rework_percent: Any, rework_recovery_percent: Any
+) -> Tuple[Fraction, Fraction, Fraction]:
+    """Validated ``(first-pass yield %, rework %, recovery %)`` as exact fractions."""
+    fpy = percentage(first_pass_yield_percent, "first_pass_yield_percent")
+    rw = percentage(rework_percent, "rework_percent")
+    rec = percentage(rework_recovery_percent, "rework_recovery_percent")
+    if fpy + rw > _HUNDRED:
+        raise InvalidConfigurationError(
+            "first_pass_yield_percent (%s) + rework_percent (%s) exceeds 100."
+            % (first_pass_yield_percent, rework_percent),
+            parameter="rework_percent",
+            hint="Every unit is good, reworked or scrapped on first inspection.",
+        )
+    return fpy, rw, rec
+
+
 def calculate_rework(
     input_quantity: Any,
     *,
@@ -184,16 +201,7 @@ def calculate_rework(
     ('945', '55')
     """
     total = non_negative(input_quantity, "input_quantity")
-    fpy = percentage(first_pass_yield_percent, "first_pass_yield_percent")
-    rw = percentage(rework_percent, "rework_percent")
-    rec = percentage(rework_recovery_percent, "rework_recovery_percent")
-    if fpy + rw > _HUNDRED:
-        raise InvalidConfigurationError(
-            "first_pass_yield_percent (%s) + rework_percent (%s) exceeds 100."
-            % (first_pass_yield_percent, rework_percent),
-            parameter="rework_percent",
-            hint="Every unit is good, reworked or scrapped on first inspection.",
-        )
+    fpy, rw, rec = _rework_rates(first_pass_yield_percent, rework_percent, rework_recovery_percent)
     good = total * fpy / _HUNDRED
     sent = total * rw / _HUNDRED
     direct = total - good - sent
@@ -229,13 +237,9 @@ def required_input_with_rework(
     :raises ZeroDenominatorError: the final yield is 0 and ``good_output`` is positive.
     """
     g = non_negative(good_output, "good_output")
-    probe = calculate_rework(
-        1,
-        first_pass_yield_percent=first_pass_yield_percent,
-        rework_percent=rework_percent,
-        rework_recovery_percent=rework_recovery_percent,
-    )
-    final = Fraction(probe.final_yield_percent) / _HUNDRED
+    fpy, rw, rec = _rework_rates(first_pass_yield_percent, rework_percent, rework_recovery_percent)
+    # exact final yield as a fraction of 1 - never the rounded percentage of a result object
+    final = (fpy + rw * rec / _HUNDRED) / _HUNDRED
     if g == 0:
         return Decimal(0)
     if final == 0:

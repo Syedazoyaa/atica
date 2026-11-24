@@ -254,9 +254,14 @@ class TestDataTools:
 
     def test_import_bom_sets_session_bom(self, state, tmp_path):
         src = tmp_path / "bom.csv"
-        src.write_text("material_id,quantity_per_unit,unit\nresin,2,kg\n", encoding="utf-8")
+        src.write_text(
+            "material_id,quantity_per_unit,unit,wastage_percent,name\nresin,2,kg,,Epoxy resin\n",
+            encoding="utf-8",
+        )
         data_tools.import_bom(str(src), state)
-        assert state.bom_rows == [["resin", "2", "kg", "0"]]
+        assert state.bom_rows == [
+            ["resin", "2", "kg", "0", "Epoxy resin"]
+        ]  # the optional name survives import
         out = materials_calc.requirements({"production_quantity": "10", "rounding": "none"}, state)
         assert out.tables[0].rows[0][:3] == ["resin", "20", "kg"]
 

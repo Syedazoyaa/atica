@@ -49,7 +49,7 @@ Functions that round take `rounding=` and `places=`; `places` with `rounding="no
 
 ## Results
 
-No universal result object. Every calculation returns its own frozen dataclass, all deriving from `Result`:
+No universal result object. Calculations that produce several related figures return their own frozen dataclass deriving from `Result`; a few single-number helpers return a plain `Decimal` (`convert_quantity`, `packages_required`, `required_input_with_rework`, `round_value`, `round_to_multiple`):
 
 * numbers are `Decimal`; `unit` names the unit of the main value; `exact_*` holds the unrounded value; `warnings` is a tuple of strings; `formula` states the formula used;
 * `to_dict(numbers="decimal" | "str" | "float")` - plain data (`"str"` is JSON-safe and lossless);

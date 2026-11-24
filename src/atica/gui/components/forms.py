@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 from ..controllers._common import ROUNDING_CHOICES
 from ..models import Field
 from ..services import AppState
+from ..utils.icons import icon
 from .basics import label
 
 
@@ -139,12 +140,13 @@ class FormPanel(QWidget):
             toggle.setText("More options")
             toggle.setCheckable(True)
             toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-            toggle.setArrowType(Qt.ArrowType.RightArrow)
-            toggle.setStyleSheet("QToolButton { border: none; color: #2464A8; font-weight: 600; }")
+            toggle.setIcon(icon("expand", size=14))
+            toggle.setCursor(Qt.CursorShape.PointingHandCursor)
+            toggle.setObjectName("moreToggle")
 
             def flip(on: bool) -> None:
                 self._advanced.setVisible(on)
-                toggle.setArrowType(Qt.ArrowType.DownArrow if on else Qt.ArrowType.RightArrow)
+                toggle.setIcon(icon("collapse" if on else "expand", size=14))
 
             toggle.toggled.connect(flip)
             layout.addWidget(toggle)

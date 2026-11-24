@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 from fractions import Fraction
-from typing import Any, Dict, Mapping, Optional, Tuple
+from typing import Any, Dict, Mapping, NamedTuple, Optional, Tuple
 
 from ..core.exceptions import (
     DuplicateMaterialError,
@@ -179,6 +179,20 @@ def _unit_factor(registry: UnitRegistry, unit: str, report_unit: Optional[str]) 
     return registry.get(report_unit).symbol, registry.factor(unit, report_unit)
 
 
+class Parts(NamedTuple):
+    """The exact (unrounded) components of a requirement, in the report unit.
+
+    Kept alongside the Decimal result so that later steps (merging duplicate lines, summing batches)
+    work from the exact fractions and never from an already-rounded Decimal.
+    """
+
+    base: Fraction
+    scrap: Fraction
+    wastage: Fraction
+    exact: Fraction
+    per_unit: Fraction
+
+
 def _requirement(
     material_id: str,
     q: Fraction,
@@ -191,6 +205,23 @@ def _requirement(
     report_unit: Optional[str],
     registry: UnitRegistry,
 ) -> MaterialRequirement:
+    return _requirement_parts(
+        material_id, q, unit, good, scrap, wastage, policy, places, report_unit, registry
+    )[0]
+
+
+def _requirement_parts(
+    material_id: str,
+    q: Fraction,
+    unit: str,
+    good: Fraction,
+    scrap: Fraction,
+    wastage: Fraction,
+    policy: Rounding,
+    places: int,
+    report_unit: Optional[str],
+    registry: UnitRegistry,
+) -> Tuple[MaterialRequirement, Parts]:
     out_unit, k = _unit_factor(registry, unit, report_unit)
     started = good / (_ONE - scrap / _HUNDRED)
     used = q * started
@@ -199,7 +230,8 @@ def _requirement(
     scrap_part = q * (started - good) * k
     wastage_part = (gross - used) * k
     exact = gross * k
-    return MaterialRequirement(
+    parts = Parts(base, scrap_part, wastage_part, exact, q * k)
+    requirement = MaterialRequirement(
         material_id=material_id,
         unit=out_unit,
         production_quantity=dec(good),
@@ -216,6 +248,7 @@ def _requirement(
         rounding=policy,
         places=places,
     )
+    return requirement, parts
 
 
 def calculate_material_requirement(

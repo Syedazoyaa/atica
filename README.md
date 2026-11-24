@@ -70,7 +70,7 @@ from atica.quality import calculate_required_input
 print(calculate_required_input(950, scrap_percent=5))   # 1000
 ```
 
-Every calculation returns a small immutable result object (`.to_dict()`, `.explain()`), raises a specific `AticaError` subclass on bad input, and never returns a made-up value.
+Most calculations return a small immutable result object with the answer, the unit, the unrounded value and the formula (`.to_dict()`, `.explain()`). A few single-number helpers return a plain `Decimal` instead: `convert_quantity`, `packages_required`, `required_input_with_rework`, `round_value`, `round_to_multiple`. Bad input always raises a specific `AticaError` subclass; nothing returns a made-up value.
 
 ## Method B - use the desktop app
 
@@ -79,7 +79,7 @@ pip install atica
 atica-gui
 ```
 
-(`python -m atica` does the same.) Ten sections: Dashboard, Unit Converter, Packaging, Materials and BOM, Production, Quality and Yield, Purchasing, Data Tools, Settings, About. Every screen calls the public functions listed in this README - the GUI contains no formulas of its own. See [docs/gui.md](docs/gui.md).
+(`python -m atica` does the same.) Ten sections: Dashboard, Unit Converter, Packaging, Materials and BOM, Production, Quality and Yield, Purchasing, Data Tools, Settings, About. A light, flat, engineering-style interface in IBM Plex Sans (bundled - nothing to install) that adapts to laptop screens and Windows display scaling. Every screen calls the public functions listed in this README - the GUI contains no formulas of its own. See [docs/gui.md](docs/gui.md).
 
 ## Calculation domains
 
@@ -108,4 +108,4 @@ atica-gui
 
 ## License
 
-MIT - see [LICENSE](LICENSE).
+ATICA is MIT-licensed - see [LICENSE](LICENSE). The desktop application bundles the **IBM Plex Sans** typeface (© 2017 IBM Corp., SIL Open Font License 1.1); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

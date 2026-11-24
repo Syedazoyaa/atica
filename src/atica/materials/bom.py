@@ -22,7 +22,8 @@ from .material import (
     _ONE,
     Bom,
     MaterialRequirement,
-    _requirement,
+    Parts,
+    _requirement_parts,
     _unit_factor,
 )
 
@@ -85,31 +86,54 @@ def calculate_bom_requirements(
     good = non_negative(production_quantity, "production_quantity")
     scrap = percentage(scrap_percent, "scrap_percent", allow_100=False)
     policy, places = resolve_rounding(rounding, places)
-    overrides = _check_overrides(bom, report_units)
-    lines: List[MaterialRequirement] = []
-    for item in bom.items:
-        lines.append(
-            _requirement(
-                item.material_id,
-                Fraction(item.quantity_per_unit),
-                item.unit,
-                good,
-                scrap,
-                Fraction(item.wastage_percent),
-                policy,
-                places,
-                overrides.get(item.material_id.casefold()),
-                reg,
-            )
-        )
-    totals = _merge(lines, policy, places, reg) if bom.allow_duplicates else tuple(lines)
+    lines, totals, _exact = _compute(
+        bom, good, scrap, policy, places, _check_overrides(bom, report_units), reg
+    )
     return BomRequirements(
         product_id=bom.product_id,
         production_quantity=dec(good),
         scrap_percent=dec(scrap),
         lines=tuple(lines),
-        totals=totals,
+        totals=tuple(totals),
     )
+
+
+def _compute(
+    bom: Bom,
+    good: Fraction,
+    scrap: Fraction,
+    policy: Rounding,
+    places: int,
+    overrides: Mapping[str, str],
+    reg: UnitRegistry,
+) -> Tuple[List[MaterialRequirement], List[MaterialRequirement], List[Fraction]]:
+    """Per-line results, per-material totals and the **exact** (unrounded) total of each material.
+
+    The exact fractions are returned so that callers needing sums (batch plans) never rebuild a quantity
+    from an already-rounded Decimal.
+    """
+    lines: List[MaterialRequirement] = []
+    parts: List[Parts] = []
+    for item in bom.items:
+        requirement, part = _requirement_parts(
+            item.material_id,
+            Fraction(item.quantity_per_unit),
+            item.unit,
+            good,
+            scrap,
+            Fraction(item.wastage_percent),
+            policy,
+            places,
+            overrides.get(item.material_id.casefold()),
+            reg,
+        )
+        lines.append(requirement)
+        parts.append(part)
+    if bom.allow_duplicates:
+        totals, exact = _merge(lines, parts, policy, places, reg)
+    else:
+        totals, exact = list(lines), [p.exact for p in parts]
+    return lines, totals, exact
 
 
 def _check_overrides(bom: Bom, report_units: Optional[Mapping[str, str]]) -> Dict[str, str]:
@@ -126,47 +150,55 @@ def _check_overrides(bom: Bom, report_units: Optional[Mapping[str, str]]) -> Dic
     return out
 
 
-def _total(group: List[MaterialRequirement], factors: List[Fraction], attr: str) -> Fraction:
-    """Sum of ``attr`` over ``group``, each line converted with its unit factor (exact)."""
-    return sum((Fraction(getattr(g, attr)) * k for g, k in zip(group, factors)), Fraction(0))
-
-
 def _merge(
-    lines: List[MaterialRequirement], policy: Rounding, places: int, reg: UnitRegistry
-) -> Tuple[MaterialRequirement, ...]:
-    groups: Dict[str, List[MaterialRequirement]] = {}
-    for line in lines:
-        groups.setdefault(line.material_id.casefold(), []).append(line)
+    lines: List[MaterialRequirement],
+    parts: List[Parts],
+    policy: Rounding,
+    places: int,
+    reg: UnitRegistry,
+) -> Tuple[List[MaterialRequirement], List[Fraction]]:
+    """Sum the lines of each material from their exact parts; round once."""
+    groups: Dict[str, List[int]] = {}
+    for index, line in enumerate(lines):
+        groups.setdefault(line.material_id.casefold(), []).append(index)
     merged: List[MaterialRequirement] = []
-    for group in groups.values():
-        if len(group) == 1:
-            merged.append(group[0])
+    exact_totals: List[Fraction] = []
+    for indexes in groups.values():
+        first = lines[indexes[0]]
+        if len(indexes) == 1:
+            merged.append(first)
+            exact_totals.append(parts[indexes[0]].exact)
             continue
-        first = group[0]
-        factors = [reg.factor(g.unit, first.unit) for g in group]  # IncompatibleUnitError if mixed dimensions
+        # IncompatibleUnitError if the lines measure different things; exact multipliers otherwise
+        factors = [reg.factor(lines[i].unit, first.unit) for i in indexes]
+        group = [parts[i] for i in indexes]
 
-        exact = _total(group, factors, "exact_quantity")
+        def total(field: str, group: List[Parts] = group, factors: List[Fraction] = factors) -> Fraction:
+            return sum((getattr(p, field) * k for p, k in zip(group, factors)), Fraction(0))
+
+        exact = total("exact")
+        exact_totals.append(exact)
         merged.append(
             MaterialRequirement(
                 material_id=first.material_id,
                 unit=first.unit,
                 production_quantity=first.production_quantity,
                 units_started=first.units_started,
-                base_quantity=dec(_total(group, factors, "base_quantity")),
-                scrap_allowance=dec(_total(group, factors, "scrap_allowance")),
-                wastage_allowance=dec(_total(group, factors, "wastage_allowance")),
+                base_quantity=dec(total("base")),
+                scrap_allowance=dec(total("scrap")),
+                wastage_allowance=dec(total("wastage")),
                 exact_quantity=dec(exact),
                 quantity=round_fraction(exact, policy, places) if policy is not Rounding.NONE else dec(exact),
-                quantity_per_unit=dec(_total(group, factors, "quantity_per_unit")),
+                quantity_per_unit=dec(total("per_unit")),
                 per_unit_unit=first.unit,
                 scrap_percent=first.scrap_percent,
                 wastage_percent=Decimal(0),
                 rounding=policy,
                 places=places,
-                warnings=("Combined %d BOM lines for this material." % len(group),),
+                warnings=("Combined %d BOM lines for this material." % len(indexes),),
             )
         )
-    return tuple(merged)
+    return merged, exact_totals
 
 
 # ------------------------------------------------------------------- capacity

@@ -12,6 +12,7 @@ from atica.core import (
     ValidationError,
 )
 from atica.purchasing import calculate_purchase_quantity
+from atica.units import UnitRegistry
 
 
 def D(x):
@@ -163,3 +164,77 @@ def test_order_invariants(required, stock, moq, multiple):
         assert order - net < max(moq, multiple) + multiple + tol
     else:
         assert order == 0
+
+
+class TestRealisticPurchasingScenarios:
+    """Worked examples a purchasing clerk would recognise; every expected figure is hand-calculated."""
+
+    def test_cement_in_25kg_bags_ordered_by_the_pallet_of_10(self):
+        reg = UnitRegistry()
+        reg.register_unit("bag", 25, "kg")
+        # need 12.5 t, 1.8 t in stock -> 10 700 kg = 428 bags; supplier ships whole pallets of 10 bags
+        r = calculate_purchase_quantity(
+            "12.5",
+            unit="t",
+            stock_on_hand="1.8",
+            purchase_unit="bag",
+            minimum_order_quantity=40,
+            order_multiple=10,
+            registry=reg,
+        )
+        assert (r.net_requirement, r.order_quantity, r.unit) == (428, 430, "bag")
+        assert r.received_quantity == D("10.75") and r.stock_unit == "t"  # 430 bags x 25 kg
+        assert r.surplus == 2 and r.constraints == ("order_multiple",)
+
+    def test_resin_in_200_litre_drums_from_a_cubic_metre_requirement(self):
+        reg = UnitRegistry()
+        reg.register_unit("drum", 200, "L")
+        r = calculate_purchase_quantity(
+            "1.234", unit="m3", stock_on_hand="0.1", purchase_unit="drum", order_multiple=1, registry=reg
+        )
+        # 1234 L - 100 L = 1134 L = 5.67 drums -> 6 drums = 1200 L = 1.2 m3
+        assert r.net_requirement == D("5.67") and r.order_quantity == 6
+        assert r.received_quantity == D("1.2") and r.surplus == D("0.33")
+
+    def test_minimum_order_forces_a_larger_order_than_needed(self):
+        reg = UnitRegistry()
+        reg.register_unit("box", 500, "piece")
+        r = calculate_purchase_quantity(
+            600,
+            unit="piece",
+            stock_on_hand=250,
+            purchase_unit="box",
+            minimum_order_quantity=2,
+            order_multiple=1,
+            registry=reg,
+        )
+        assert r.net_requirement == D("0.7") and r.order_quantity == 2 and r.received_quantity == 1000
+        assert r.constraints == ("minimum_order_quantity",) and r.surplus == D("1.3")
+
+    def test_stock_covering_the_requirement_orders_nothing_despite_a_minimum(self):
+        reg = UnitRegistry()
+        reg.register_unit("box", 500, "piece")
+        r = calculate_purchase_quantity(
+            400, unit="piece", stock_on_hand=450, purchase_unit="box", minimum_order_quantity=2, registry=reg
+        )
+        assert (r.order_quantity, r.received_quantity, r.stock_deducted) == (0, 0, D("0.8"))
+
+    def test_imperial_requirement_metric_packs(self):
+        reg = UnitRegistry()
+        reg.register_unit("sack", 25, "kg")
+        # 100 lb = 45.359237 kg = 1.81436948 sacks -> 2 sacks
+        r = calculate_purchase_quantity(100, unit="lb", purchase_unit="sack", order_multiple=1, registry=reg)
+        assert r.order_quantity == 2
+        # 2 sacks = 50 kg, reported back in the requirement's own unit (lb): 50 / 0.45359237
+        assert abs(Fraction(r.received_quantity) - Fraction(5_000_000_000, 45_359_237)) < Fraction(1, 10**40)
+        assert Fraction(r.net_requirement) == Fraction("45.359237") / 25
+
+    def test_fabric_rolls_with_kilometre_requirement(self):
+        reg = UnitRegistry()
+        reg.register_unit("roll", 50, "m")
+        r = calculate_purchase_quantity(3, unit="km", purchase_unit="roll", order_multiple=5, registry=reg)
+        assert r.order_quantity == 60 and r.surplus == 0 and r.constraints == ()
+
+    def test_moq_not_a_multiple_of_the_order_multiple_is_flagged_and_still_valid(self):
+        r = calculate_purchase_quantity(5, unit="kg", minimum_order_quantity=50, order_multiple=12)
+        assert r.order_quantity == 60 and "multiple" in r.warnings[0]

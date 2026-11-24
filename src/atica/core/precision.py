@@ -102,7 +102,7 @@ def to_decimal(value: Any, name: str = "value") -> Decimal:
         elif isinstance(value, float):
             result = Decimal(repr(value))
         elif isinstance(value, Fraction):
-            result = fraction_to_decimal(value)
+            result = fraction_to_decimal(check_fraction_magnitude(value, name))
         elif isinstance(value, str):
             result = Decimal(value.strip())
         else:
@@ -132,14 +132,32 @@ def to_fraction(value: Any, name: str = "value") -> Fraction:
     Fraction(5, 9)
     """
     if isinstance(value, Fraction):
-        return value
+        return check_fraction_magnitude(value, name)
     if isinstance(value, str) and "/" in value:
         left, _, right = value.partition("/")
         num, den = to_fraction(left, name), to_fraction(right, name)
         if den == 0:
             raise InvalidQuantityError("%r has a zero denominator." % value, parameter=name)
-        return num / den
+        return check_fraction_magnitude(num / den, name)
     return Fraction(to_decimal(value, name))
+
+
+_FRACTION_LOW = Fraction(1, 10**MAX_MAGNITUDE)
+_FRACTION_HIGH = Fraction(10 ** (MAX_MAGNITUDE + 1))
+
+
+def check_fraction_magnitude(value: Fraction, name: str = "value") -> Fraction:
+    """Apply the same magnitude limits to an exact fraction as to Decimal/int/float input.
+
+    Non-zero values must satisfy ``1e-300 <= |value| < 1e301`` (the same as ``|Decimal.adjusted()| <= 300``).
+    The check is exact; the fraction itself is returned unchanged.
+    """
+    if value != 0 and not (_FRACTION_LOW <= abs(value) < _FRACTION_HIGH):
+        raise NumericRangeError(
+            "%s is outside the supported range (about 1e-%d to 1e%d)." % (name, MAX_MAGNITUDE, MAX_MAGNITUDE),
+            parameter=name,
+        )
+    return value
 
 
 def fraction_to_decimal(value: Fraction) -> Decimal:

@@ -238,6 +238,22 @@ class UnitRegistry:
             )
         return name
 
+    def _validate_aliases(self, name: str, aliases: Iterable[str]) -> List[str]:
+        """Each alias must be a new name, different from ``name`` and from the other aliases."""
+        if isinstance(aliases, str):
+            raise UnitDefinitionError(
+                "aliases must be a list of names, not a single string.",
+                parameter="aliases",
+                hint="Write aliases=[%r]." % aliases,
+            )
+        checked: List[str] = []
+        for alias in aliases:
+            alias = self._validate_new_name(alias, "alias")
+            if alias == name or alias in checked:
+                raise UnitDefinitionError("Duplicate alias %r." % alias, parameter="aliases")
+            checked.append(alias)
+        return checked
+
     def register_unit(
         self,
         name: str,
@@ -277,12 +293,7 @@ class UnitRegistry:
                     "The conversion factor must be greater than zero (got %s)." % _show(ratio),
                     parameter="factor",
                 )
-            alias_list: List[str] = []
-            for alias in aliases:
-                alias = self._validate_new_name(alias, "alias")
-                if alias == name or alias in alias_list:
-                    raise UnitDefinitionError("Duplicate alias %r." % alias, parameter="aliases")
-                alias_list.append(alias)
+            alias_list = self._validate_aliases(name, aliases)
             unit = Unit(
                 symbol=name,
                 name=display_name or name,
@@ -308,7 +319,7 @@ class UnitRegistry:
             if category in self._bases:
                 raise UnitDefinitionError("Category %r already exists." % category, parameter="category")
             name = self._validate_new_name(name)
-            alias_list = [self._validate_new_name(a, "alias") for a in aliases]
+            alias_list = self._validate_aliases(name, aliases)
             unit = Unit(
                 name,
                 name,

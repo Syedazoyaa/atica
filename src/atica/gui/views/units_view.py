@@ -19,6 +19,7 @@ from ..components.basics import Banner
 from ..controllers import unit_conversion
 from ..models import Field
 from ..services import AppState
+from ..styles import CURRENT
 from ..utils.errors import guard
 from ..utils.icons import icon
 from .base import ToolView
@@ -76,7 +77,7 @@ class UnitsView(ToolView):
             ),
         ]
         swap = QPushButton(" Swap units")
-        swap.setIcon(icon("swap", "#102B50", 16))
+        swap.setIcon(icon("swap", size=16))
         panel = CalculatorPanel(
             "Convert",
             fields,
@@ -178,8 +179,8 @@ class UnitsView(ToolView):
                 row, 1, QTableWidgetItem("1 %s = %s %s  (%s)" % (unit.symbol, ratio, ref, unit.category))
             )
             button = QPushButton(" Remove")
-            button.setIcon(icon("trash", "#B42318", 14))
-            button.setStyleSheet("QPushButton { color: #B42318; padding: 3px 8px; }")
+            button.setObjectName("danger")
+            button.setIcon(icon("trash", CURRENT.error, 14))
             button.clicked.connect(lambda _c=False, name=unit.symbol: self._remove(name))
             table.setCellWidget(row, 2, button)
 

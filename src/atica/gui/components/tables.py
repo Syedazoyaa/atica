@@ -61,10 +61,10 @@ class TableEditor(QWidget):
         self._table.itemChanged.connect(lambda _i: self.changed.emit())
 
         add = QPushButton(" Add row")
-        add.setIcon(icon("plus", "#102B50", 16))
+        add.setIcon(icon("plus", size=16))
         add.clicked.connect(lambda: self.add_row())
         remove = QPushButton(" Remove selected")
-        remove.setIcon(icon("trash", "#102B50", 16))
+        remove.setIcon(icon("trash", size=16))
         remove.clicked.connect(self.remove_selected)
         bar = QHBoxLayout()
         bar.setSpacing(8)

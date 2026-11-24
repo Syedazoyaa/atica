@@ -17,6 +17,7 @@ from ._rows import (
     ConversionReport,
     Row,
     bom_from_rows,
+    check_cells_have_headers,
     check_headers,
     check_input_path,
     check_output_path,
@@ -56,8 +57,9 @@ def read_csv(path: Any, *, max_rows: int = MAX_ROWS) -> Tuple[List[str], List[Ro
                         % (reader.line_num, len(cells), len(fieldnames)),
                         parameter="path",
                     )
+                check_cells_have_headers([c.strip() for c in cells], fieldnames, reader.line_num)
                 rows.append(
-                    {h: (cells[i].strip() if i < len(cells) else "") for i, h in enumerate(fieldnames)}
+                    {h: (cells[i].strip() if i < len(cells) else "") for i, h in enumerate(fieldnames) if h}
                 )
                 numbers.append(reader.line_num)
     except UnicodeDecodeError as exc:
@@ -107,5 +109,5 @@ def convert_csv(
 
 def read_bom_csv(path: Any, *, product_id: str = "", allow_duplicates: bool = False) -> Bom:
     """Load a BOM from a CSV with columns ``material_id, quantity_per_unit, unit`` (+ optional ``wastage_percent``, ``name``)."""
-    _, rows, _ = read_csv(path)
-    return bom_from_rows(rows, product_id=product_id, allow_duplicates=allow_duplicates)
+    _, rows, numbers = read_csv(path)
+    return bom_from_rows(rows, product_id=product_id, allow_duplicates=allow_duplicates, row_numbers=numbers)

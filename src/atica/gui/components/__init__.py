@@ -1,6 +1,7 @@
 """Reusable widgets: cards, banners, forms, tables, result panel, sidebar and the calculator layout."""
 
-from .basics import Banner, Card, add_shadow, label
+from .backdrop import BackdropWidget, draw_backdrop
+from .basics import Banner, Card, label
 from .forms import FormPanel, UnitCombo, rounding_fields
 from .panel import CalculatorPanel
 from .results import ResultPanel
@@ -8,6 +9,7 @@ from .sidebar import Sidebar
 from .tables import TableEditor
 
 __all__ = [
+    "BackdropWidget",
     "Banner",
     "CalculatorPanel",
     "Card",
@@ -16,7 +18,7 @@ __all__ = [
     "Sidebar",
     "TableEditor",
     "UnitCombo",
-    "add_shadow",
+    "draw_backdrop",
     "label",
     "rounding_fields",
 ]

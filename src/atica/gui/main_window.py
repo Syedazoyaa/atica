@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QHBoxLayout, QMainWindow, QStackedWidget, QWidget
 
@@ -77,13 +78,21 @@ QUICK_TOOLS = [
 ]
 
 
+MIN_WIDTH = 760
+MIN_HEIGHT = 480
+#: below this window width the sidebar shows icons only
+COMPACT_BELOW = 1020
+
+
 class MainWindow(QMainWindow):
     def __init__(self, state: Optional[AppState] = None) -> None:
         super().__init__()
         self.state = state or AppState()
         self.setWindowTitle("ATICA " + __version__)
-        self.resize(1280, 820)
-        self.setMinimumSize(1000, 680)
+        # Sized from the screen, not fixed: a 1366 x 768 laptop at 150 % scaling offers only ~910 x 510
+        # logical pixels, so the minimum must stay small and the layout must adapt (see resizeEvent).
+        self.setMinimumSize(MIN_WIDTH, MIN_HEIGHT)
+        self.resize(self._initial_size())
 
         self.views: Dict[str, QWidget] = {}
         modules = [(k, t, d, i) for k, t, i, d in SECTIONS if d]
@@ -107,6 +116,7 @@ class MainWindow(QMainWindow):
 
         central = QWidget()
         central.setObjectName("content")
+        central.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         layout = QHBoxLayout(central)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -120,6 +130,33 @@ class MainWindow(QMainWindow):
             action.triggered.connect(lambda _c=False, n=i: self.sidebar.select(n))
             self.addAction(action)
         self.sidebar.select(0)
+        self._apply_layout_mode()
+        self._focus_set = False
+
+    def showEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        super().showEvent(event)
+        if not self._focus_set:
+            # start without a keyboard-focus ring on the first navigation button; Tab still reaches everything
+            self._focus_set = True
+            self.centralWidget().setFocus(Qt.FocusReason.OtherFocusReason)
+
+    def _initial_size(self) -> QSize:
+        screen = self.screen()
+        available = screen.availableGeometry() if screen is not None else None
+        if available is None:
+            return QSize(1280, 820)
+        width = min(1280, int(available.width() * 0.92))
+        height = min(820, int(available.height() * 0.92))
+        return QSize(max(MIN_WIDTH, width), max(MIN_HEIGHT, height))
+
+    def _apply_layout_mode(self) -> None:
+        compact = self.width() < COMPACT_BELOW
+        if compact != self.sidebar.compact:
+            self.sidebar.set_compact(compact)
+
+    def resizeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        super().resizeEvent(event)
+        self._apply_layout_mode()
 
     def navigate(self, key: str, tab: int = 0) -> None:
         """Show a screen (and one of its tabs)."""

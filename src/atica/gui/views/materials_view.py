@@ -16,7 +16,11 @@ from ..utils.icons import icon
 from .base import ToolView
 
 _MATERIAL_KINDS = ("mass", "volume", "length", "area", "count")
-_EXAMPLE_BOM = [["steel", "0.25", "kg", "0"], ["paint", "40", "mL", "10"], ["screws", "4", "piece", "0"]]
+_EXAMPLE_BOM = [
+    ["steel", "0.25", "kg", "0", "Structural steel"],
+    ["paint", "40", "mL", "10", "Primer"],
+    ["screws", "4", "piece", "0", ""],
+]
 
 
 class MaterialsView(ToolView):
@@ -29,7 +33,7 @@ class MaterialsView(ToolView):
         )
         state.bom_rows = [list(r) for r in _EXAMPLE_BOM]
         self.bom = TableEditor(
-            ["Material", "Qty per unit", "Unit", "Wastage %"],
+            ["Material", "Qty per unit", "Unit", "Wastage %", "Name (optional)"],
             state,
             unit_columns={2: _MATERIAL_KINDS},
             min_height=170,
@@ -38,7 +42,7 @@ class MaterialsView(ToolView):
         self.bom.changed.connect(self._bom_edited)
         self._import_banner = Banner("error")
         import_button = QPushButton(" Import BOM from CSV / Excel…")
-        import_button.setIcon(icon("folder", "#102B50", 16))
+        import_button.setIcon(icon("folder", size=16))
         import_button.clicked.connect(self._import)
         buttons = QWidget()
         bl = QHBoxLayout(buttons)
@@ -88,7 +92,7 @@ class MaterialsView(ToolView):
             ["Material", "Available", "Unit"], state, unit_columns={2: _MATERIAL_KINDS}, min_height=150
         )
         fill = QPushButton(" Fill from BOM")
-        fill.setIcon(icon("materials", "#102B50", 16))
+        fill.setIcon(icon("materials", size=16))
         fill.clicked.connect(self._fill_stock)
         fill_row = QWidget()
         fl = QHBoxLayout(fill_row)

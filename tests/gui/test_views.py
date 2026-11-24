@@ -248,10 +248,10 @@ class TestScreens:
     def test_data_tools_bom_import_and_error(self, window, tmp_path):
         view = window.views["data"]
         good = tmp_path / "bom.csv"
-        good.write_text("material_id,quantity_per_unit,unit\nresin,2,kg\n", encoding="utf-8")
+        good.write_text("material_id,quantity_per_unit,unit,name\nresin,2,kg,Epoxy resin\n", encoding="utf-8")
         view.import_bom(str(good))
-        assert window.state.bom_rows == [["resin", "2", "kg", "0"]]
-        assert window.views["materials"].bom.rows()[0][:3] == ["resin", "2", "kg"]
+        assert window.state.bom_rows == [["resin", "2", "kg", "0", "Epoxy resin"]]
+        assert window.views["materials"].bom.rows()[0] == ["resin", "2", "kg", "0", "Epoxy resin"]
         bad = tmp_path / "bad.csv"
         bad.write_text("a,b\n1,2\n", encoding="utf-8")
         view.import_bom(str(bad))
@@ -311,16 +311,12 @@ class TestApplication:
 
         css = build_stylesheet(LIGHT)
         for colour in (
-            "#102B50",
-            "#2464A8",
-            "#83C9F2",
-            "#EAF4FC",
-            "#FFFFFF",
-            "#F5F8FC",
-            "#192B40",
-            "#64748B",
-            "#DCE6F0",
-        ):
+            "#E3E4E7",
+            "#C9CCD2",
+            "#F3F0F2",
+            "#D9C7C0",
+            "#B8B5B9",
+        ):  # the five identity colours (see test_design)
             assert colour.upper() in css.upper(), colour
         assert css.count("{") == css.count("}") and "{{" not in css and "{navy" not in css  # fully formatted
 

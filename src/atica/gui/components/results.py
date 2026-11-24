@@ -82,10 +82,10 @@ class ResultPanel(QWidget):
         actions = QHBoxLayout(self._actions)
         actions.setContentsMargins(0, 0, 0, 0)
         copy = QPushButton(" Copy result")
-        copy.setIcon(icon("copy", "#102B50", 16))
+        copy.setIcon(icon("copy", size=16))
         copy.clicked.connect(self.copy)
         export = QPushButton(" Export…")
-        export.setIcon(icon("export", "#102B50", 16))
+        export.setIcon(icon("export", size=16))
         export.clicked.connect(self.export)
         actions.addWidget(copy)
         actions.addWidget(export)
@@ -197,11 +197,11 @@ class ResultPanel(QWidget):
         filters = "CSV file (*.csv)"
         if importlib.util.find_spec("openpyxl") is not None:
             filters += ";;Excel workbook (*.xlsx)"
-        path, _ = QFileDialog.getSaveFileName(self, "Export result", "atica-result", filters)
+        path, chosen = QFileDialog.getSaveFileName(self, "Export result", "atica-result", filters)
         if not path:
             return
         if not os.path.splitext(path)[1]:
-            path += ".csv"
+            path += ".xlsx" if "xlsx" in chosen else ".csv"
         outcome = self._outcome
         # the file dialog already asked about overwriting
         saved, err = guard(lambda: data_tools.export_outcome(outcome, path, overwrite=True))

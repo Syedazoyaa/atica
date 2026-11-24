@@ -29,7 +29,31 @@ First release as a single product: the calculation library **and** the desktop a
 * Exceptions: `field` -> `parameter`, new `hint`; `AticaError` subclasses reorganised (see `docs/core.md`).
 * Python >= 3.9 (unchanged).
 
-### Corrected
+### Release-hardening pass (before the first public release)
+
+Corrected:
+
+* **Numeric limits** - a `Fraction` passed directly bypassed the documented magnitude limits (about 1e-300 .. 1e301) that apply to `int`, `float`, `Decimal` and `str` input; it is now checked the same way (exactly, before any conversion), including `'a/b'` ratio strings.
+* **`UnitRegistry.register_base_unit`** accepted duplicate aliases, an alias equal to the unit's own name, and a bare string as `aliases` (split into characters); all are now rejected like `register_unit`, with no half-registered state.
+* **`calculate_batch_materials`** and merged duplicate BOM lines summed *rounded* Decimals (50 significant digits), so repeating decimals were not exact; they now sum the exact fractions and round once (`exact_total` equals a single whole-quantity run exactly).
+* **`required_input_with_rework`** divided by an already-rounded yield percentage; at reduced precision `1 / (1/7)` came out as `7.00001`. It now uses the exact fractions (shared validation with `calculate_rework`).
+* **Excel**: populated cells beyond the header width (or under a blank header) were silently dropped; they now raise an `IntegrationError` naming the row and column. The same check applies to CSV. Invalid worksheet names and control characters in exported text now raise clear `IntegrationError`s instead of openpyxl errors.
+* **Source row numbers**: `ConversionReport` gained `row_numbers` (the file position of every converted row); the Data Tools table now shows real CSV line / Excel row numbers for converted *and* failed rows, and BOM import errors quote the true source row.
+* **`.xlsm`** is readable but is no longer offered (or accepted) as an export format; save dialogs offer CSV and `.xlsx` only, and a missing extension follows the chosen filter.
+* **BOM names**: the optional material name now survives import (CSV/Excel -> GUI editor -> calculation); the editor has a "Name (optional)" column.
+* README/docs no longer claim every function returns a result object (a few return plain `Decimal`).
+
+Desktop application redesign:
+
+* New visual identity: the five-colour palette (`#E3E4E7`, `#C9CCD2`, `#F3F0F2`, `#D9C7C0`, `#B8B5B9`) with near-black text, flat square-edged panels, underlined inputs, charcoal primary action, no gradients or shadows; all tokens centralised in `gui/styles/theme.py`, no colour or font literals elsewhere.
+* **IBM Plex Sans** (Regular, Medium, SemiBold) bundled and registered with Qt; SIL OFL 1.1 licence and `THIRD_PARTY_NOTICES.md` shipped in the wheel and sdist.
+* The ATICA wordmark is IBM Plex Sans SemiBold converted to vector outlines (light and dark variants); the symbol is kept (squared "A") and recoloured to the palette.
+* Subtle engineering-drawing SVG backdrops (grid, construction circles, meshing gears, registration marks) at three intensities, painted behind opaque cards only.
+* The dashboard's "Welcome to ATICA" banner and its container were removed; the dashboard is now module shortcuts, quick calculations and real session activity.
+* Responsive: screen-aware initial size, minimum 760 x 480, icon-only sidebar below 1020 px, single scrolling column for calculators below 880 px; verified at 1920x1080, 1600x900, 1366x768 and at Qt scale factors 1, 1.25 and 1.5.
+* Accessibility: visible focus outlines for every control, keyboard-operable dashboard tiles, WCAG AA text contrast (tested).
+
+### Corrected (original rebuild)
 
 * Duplicate BOM material ids silently overwrote each other; now rejected (or explicitly merged).
 * A 100 % scrap rate was rejected even for expected output and scrap quantity; now valid there (and an explicit error where it makes a calculation impossible).

@@ -74,7 +74,7 @@ class SettingsView(ToolView):
         lay.addWidget(card)
         lay.addWidget(session)
         lay.addStretch(1)
-        self.add_tab("Preferences", holder)
+        self.add_scrolling_tab("Preferences", holder)
 
         self.places.valueChanged.connect(self._changed)
         self.precision.valueChanged.connect(self._changed)

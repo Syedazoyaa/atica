@@ -7,7 +7,8 @@ Never publish without explicit sign-off. Items marked **(verified)** were checke
 - [ ] Choose the final version in `src/atica/version.py` (the only place; the wheel, `atica.__version__`, the GUI and `atica-gui --version` all read it) and date the `CHANGELOG.md` entry.
 - [ ] Add a `[project.urls]` table (Homepage, Source, Changelog, Issues) with the real repository URLs and set the real author/maintainer - none are declared yet because no repository URL was provided.
 - [ ] Confirm the PyPI project name `atica` is available / owned.
-- [ ] `python docs/_generate_api.py` (regenerates `docs/api-reference.md`).
+- [ ] `python docs/_generate_api.py` (regenerates `docs/api-reference.md`) and, if the brand or backdrop drawings changed, `python docs/_make_brand_assets.py`.
+- [ ] Font licensing: `THIRD_PARTY_NOTICES.md` and `src/atica/gui/resources/fonts/OFL.txt` are present and the wheel's `dist-info/licenses` contains both **(verified)**.
 - [ ] `ruff check src tests && ruff format --check src tests && mypy` **(verified)**
 - [ ] `pytest --cov=atica` on every supported Python (CI matrix 3.9-3.13); GUI tests run with `QT_QPA_PLATFORM=offscreen`. Core tests on 3.9, 3.10, 3.11, 3.12, 3.13 **(verified locally)**
 
@@ -15,9 +16,9 @@ Never publish without explicit sign-off. Items marked **(verified)** were checke
 
 - [ ] `python -m build` -> exactly one wheel and one sdist **(verified)**
 - [ ] `twine check dist/*` **(verified)**
-- [ ] Wheel contains `atica/py.typed`, the SVG icons and no `tests/`, `docs/` or scratch files; sdist contains sources, tests, docs, examples **(verified)**
+- [ ] Wheel contains `atica/py.typed`, the SVG icons/logos/backgrounds, the three IBM Plex Sans TTFs and `OFL.txt`, and no `tests/`, `docs/` or scratch files; sdist contains sources, tests, docs (without screenshots), examples and the notices **(verified)**
 - [ ] `METADATA` shows `Requires-Dist: PySide6>=6.5,<7` as a normal dependency and `Provides-Extra: excel, dev`; `[project.scripts] atica-gui` **(verified)**
-- [ ] Fresh virtual environment: `pip install dist/atica-*.whl`, then `import atica`, a real calculation, `atica-gui --version`, `atica-gui --check` (offscreen) - run from a directory that is *not* the repository **(verified for Windows / Python 3.12)**
+- [ ] Fresh virtual environment: `pip install dist/atica-*.whl`, then `import atica`, a real calculation, `atica-gui --version`, `atica-gui --check` (offscreen and on a real display) - run from a directory that is *not* the repository; confirm the About screen shows "IBM Plex Sans" and all ten screens open **(verified for Windows / Python 3.12)**
 - [ ] Same install test from the sdist (`pip install dist/atica-*.tar.gz`)
 
 ## TestPyPI

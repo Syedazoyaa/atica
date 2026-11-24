@@ -32,12 +32,17 @@ class RowError:
 
 @dataclass(frozen=True)
 class ConversionReport(Result):
-    """Outcome of converting many rows: converted rows (original columns + result columns) and errors."""
+    """Outcome of converting many rows: converted rows (original columns + result columns) and errors.
+
+    ``row_numbers[i]`` is the position **in the source file** (CSV line / Excel row) of ``rows[i]``;
+    every :class:`RowError` carries its source row number too.
+    """
 
     fieldnames: Tuple[str, ...]
     rows: Tuple[Row, ...]
     errors: Tuple[RowError, ...] = ()
     total_rows: int = 0
+    row_numbers: Tuple[int, ...] = ()
 
     @property
     def succeeded(self) -> int:
@@ -97,6 +102,31 @@ def check_headers(headers: Sequence[str]) -> List[str]:
     return cleaned
 
 
+def column_letter(index: int) -> str:
+    """0 -> A, 25 -> Z, 26 -> AA (for messages about spreadsheet columns)."""
+    letters = ""
+    index += 1
+    while index:
+        index, remainder = divmod(index - 1, 26)
+        letters = chr(65 + remainder) + letters
+    return letters
+
+
+def check_cells_have_headers(cells: Sequence[str], headers: Sequence[str], row_number: int) -> None:
+    """A populated cell without a header would be dropped silently - refuse instead.
+
+    ``cells`` are the row's texts; ``headers`` the cleaned header row (blank = no header).
+    """
+    for index, text in enumerate(cells):
+        if text and (index >= len(headers) or not headers[index]):
+            raise IntegrationError(
+                "Row %d has a value (%r) in column %s, which has no header."
+                % (row_number, text, column_letter(index)),
+                parameter="path",
+                hint="Add a header for that column or clear the cell; ATICA will not drop data silently.",
+            )
+
+
 def convert_rows(
     rows: Sequence[Mapping[str, Any]],
     *,
@@ -128,6 +158,7 @@ def convert_rows(
             )
     fieldnames = tuple(names) + tuple(c for c in RESULT_COLUMNS if c not in names)
     ok: List[Row] = []
+    ok_numbers: List[int] = []
     errors: List[RowError] = []
     for index, row in enumerate(rows):
         number = row_numbers[index] if row_numbers else index + 1
@@ -152,14 +183,19 @@ def convert_rows(
             warnings="; ".join(result.warnings),
         )
         ok.append(out)
-    return ConversionReport(fieldnames, tuple(ok), tuple(errors), len(rows))
+        ok_numbers.append(number)
+    return ConversionReport(fieldnames, tuple(ok), tuple(errors), len(rows), tuple(ok_numbers))
 
 
 BOM_COLUMNS = ("material_id", "quantity_per_unit", "unit")
 
 
 def bom_from_rows(
-    rows: Sequence[Mapping[str, Any]], *, product_id: str = "", allow_duplicates: bool = False
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    product_id: str = "",
+    allow_duplicates: bool = False,
+    row_numbers: Optional[Sequence[int]] = None,
 ) -> Bom:
     """Build a :class:`~atica.materials.Bom` from rows with ``material_id, quantity_per_unit, unit``
     (optional ``wastage_percent`` and ``name``).  Any invalid row raises with its row number."""
@@ -176,7 +212,8 @@ def bom_from_rows(
             hint="Required columns: %s (optional: wastage_percent, name)." % ", ".join(BOM_COLUMNS),
         )
     items: List[BomItem] = []
-    for index, row in enumerate(rows, start=1):
+    for index, row in enumerate(rows):
+        number = row_numbers[index] if row_numbers else index + 1
         try:
             items.append(
                 BomItem(
@@ -189,6 +226,6 @@ def bom_from_rows(
             )
         except AticaError as exc:
             raise IntegrationError(
-                "Row %d: %s" % (index, exc.message), parameter="rows", hint=exc.hint
+                "Row %d: %s" % (number, exc.message), parameter="rows", hint=exc.hint
             ) from exc
     return Bom(tuple(items), product_id=product_id, allow_duplicates=allow_duplicates)
