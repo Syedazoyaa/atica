@@ -4,11 +4,47 @@ from __future__ import annotations
 
 from typing import Optional
 
-from PySide6.QtWidgets import QFrame, QScrollArea, QTabWidget, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QScrollArea, QTabWidget, QVBoxLayout, QWidget
 
 from ..components.backdrop import BackdropWidget
 from ..components.basics import label
 from ..services import AppState
+from ..styles import CURRENT as T
+from ..utils.icons import pixmap
+
+_PAGE_ICONS = {
+    "Unit Converter": "units",
+    "Packaging Calculations": "packaging",
+    "Materials and BOM": "materials",
+    "Production Calculations": "production",
+    "Quality and Yield": "quality",
+    "Purchasing Calculations": "purchasing",
+    "Data Tools": "data",
+    "Settings": "settings",
+    "About ATICA": "about",
+}
+
+
+class PageHeader(QWidget):
+    """The compact, consistently aligned title row shared by application pages."""
+
+    HEIGHT = 30
+
+    def __init__(self, title: str, icon_name: str, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("pageHeader")
+        self.setFixedHeight(self.HEIGHT)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(16, 0, 0, 0)
+        layout.setSpacing(8)
+        mark = label("", "pageHeaderIcon")
+        mark.setPixmap(pixmap(icon_name, T.ink, 18))
+        mark.setFixedSize(18, 18)
+        mark.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(mark)
+        layout.addWidget(label(title, "pageTitle"), 0, Qt.AlignmentFlag.AlignVCenter)
+        layout.addStretch(1)
 
 
 class ToolView(BackdropWidget):
@@ -24,7 +60,8 @@ class ToolView(BackdropWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 22, 24, 8)
         layout.setSpacing(4)
-        layout.addWidget(label(title, "pageTitle"))
+        self.header = PageHeader(title, _PAGE_ICONS[title])
+        layout.addWidget(self.header)
         layout.addWidget(label(subtitle, "pageSubtitle", wrap=True))
         layout.addSpacing(8)
         self.tabs = QTabWidget()

@@ -124,6 +124,18 @@ QMainWindow {{ background: {background}; }}
 QWidget#content {{ background: transparent; }}
 QToolTip {{ background: {ink}; color: {ink_inverse}; border: none; padding: 6px 8px; }}
 
+/* ---------- custom window frame ---------- */
+QWidget#titleBar {{ background: {surface}; }}
+QLabel#titleBarTitle {{ color: {ink}; font-size: 13px; font-weight: 500; }}
+QToolButton#titleBarMinimize, QToolButton#titleBarMaximize, QToolButton#titleBarClose {{
+    background: transparent; border: none; padding: 0;
+}}
+QToolButton#titleBarMinimize:hover, QToolButton#titleBarMaximize:hover {{ background: {layer_hover}; }}
+QToolButton#titleBarMinimize:pressed, QToolButton#titleBarMaximize:pressed {{ background: {muted}; }}
+QToolButton#titleBarClose:hover, QToolButton#titleBarClose:pressed {{
+    background: {error}; color: {ink_inverse};
+}}
+
 /* ---------- navigation ---------- */
 QLabel#brandTag {{ color: {ink_secondary}; font-size: 12px; }}
 QLabel#brandName {{ color: {ink}; font-size: 17px; font-weight: 600; letter-spacing: 0.5px; }}
@@ -140,6 +152,8 @@ QPushButton#navButton:focus {{ outline: none; border: 2px solid {ink}; }}
 QPushButton#navButton[compact="true"] {{ text-align: center; padding: 10px 0; }}
 
 /* ---------- typography ---------- */
+QWidget#pageHeader {{ background: transparent; min-height: 30px; max-height: 30px; }}
+QLabel#pageHeaderIcon {{ background: transparent; }}
 QLabel#pageTitle {{ font-size: 25px; font-weight: 600; color: {ink}; }}
 QLabel#pageSubtitle {{ font-size: 15px; color: {ink_secondary}; }}
 QLabel#cardTitle {{ font-size: 17px; font-weight: 500; color: {ink}; }}

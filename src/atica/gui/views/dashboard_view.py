@@ -28,6 +28,7 @@ from ..components.backdrop import BackdropWidget
 from ..services import AppState
 from ..styles import CURRENT as T
 from ..utils.icons import icon, pixmap
+from .base import PageHeader
 
 # (section key, title, one-line description, icon)
 Module = Tuple[str, str, str, str]
@@ -144,7 +145,7 @@ class DashboardView(BackdropWidget):
         head = QHBoxLayout()
         titles = QVBoxLayout()
         titles.setSpacing(4)
-        titles.addWidget(label("Dashboard", "pageTitle"))
+        titles.addWidget(PageHeader("Dashboard", "dashboard"))
         titles.addWidget(
             label(
                 "Exact manufacturing calculations: units, packaging, materials, production, quality and purchasing. "

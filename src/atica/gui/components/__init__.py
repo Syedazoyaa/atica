@@ -7,6 +7,7 @@ from .panel import CalculatorPanel
 from .results import ResultPanel
 from .sidebar import Sidebar
 from .tables import TableEditor
+from .title_bar import TitleBar
 
 __all__ = [
     "BackdropWidget",
@@ -17,6 +18,7 @@ __all__ = [
     "ResultPanel",
     "Sidebar",
     "TableEditor",
+    "TitleBar",
     "UnitCombo",
     "draw_backdrop",
     "label",
