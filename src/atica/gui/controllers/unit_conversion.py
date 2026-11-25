@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from atica import units
-from atica.core import use_precision
+from atica.core import format_duration, use_precision
 
 from ..models import Outcome
 from ..services import AppState, fmt, with_unit
@@ -39,6 +39,21 @@ def convert(values: Mapping[str, Any], state: AppState) -> Outcome:
             with_unit(result.value, result.unit, state),
         ),
     )
+    if result.category == "time":
+        abbreviations = {
+            "day": "d",
+            "days": "d",
+            "hour": "h",
+            "hours": "h",
+            "minute": "min",
+            "minutes": "min",
+            "second": "sec",
+            "seconds": "sec",
+        }
+        outcome.headline = " ".join(
+            abbreviations.get(part, part)
+            for part in format_duration(result.value, result.unit, state.registry).split()
+        )
     if result.rounding.value != "none":
         outcome.rows.append(("Exact value", with_unit(result.exact_value, result.unit, state)))
         outcome.rows.append(

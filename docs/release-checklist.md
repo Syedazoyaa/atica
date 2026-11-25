@@ -6,6 +6,8 @@ Never publish without explicit sign-off. Items marked **(verified)** were checke
 
 - [ ] Choose the final version in `src/atica/version.py` (the only place; the wheel, `atica.__version__`, the GUI and `atica-gui --version` all read it) and date the `CHANGELOG.md` entry.
 - [ ] Add a `[project.urls]` table (Homepage, Source, Changelog, Issues) with the real repository URLs and set the real author/maintainer - none are declared yet because no repository URL was provided.
+- [ ] Set the real initial release date in `src/atica/gui/branding.py` (`INITIAL_RELEASE`, currently a placeholder) and update `UPDATED_ON`.
+- [ ] Licence: `LICENSE` is the unmodified GPL-3.0 text and `pyproject.toml` says `GPL-3.0-only`; the wheel's `dist-info/licenses` carries `LICENSE`.
 - [ ] Confirm the PyPI project name `atica` is available / owned.
 - [ ] `python docs/_generate_api.py` (regenerates `docs/api-reference.md`) and, if the brand or backdrop drawings changed, `python docs/_make_brand_assets.py`.
 - [ ] Font licensing: `THIRD_PARTY_NOTICES.md` and `src/atica/gui/resources/fonts/OFL.txt` are present and the wheel's `dist-info/licenses` contains both **(verified)**.

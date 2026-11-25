@@ -81,7 +81,7 @@ QUICK_TOOLS = [
 MIN_WIDTH = 760
 MIN_HEIGHT = 480
 #: below this window width the sidebar shows icons only
-COMPACT_BELOW = 1020
+COMPACT_BELOW = 1100
 
 
 class MainWindow(QMainWindow):

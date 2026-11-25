@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from atica import production
-from atica.core import use_precision
+from atica.core import format_duration, use_precision
 
 from ..models import Outcome, ResultTable
 from ..services import AppState, fmt, with_unit
@@ -61,6 +61,11 @@ def batches(values: Mapping[str, Any], state: AppState) -> Outcome:
     return outcome
 
 
+def _human(value, unit, state):
+    """``1.5 h`` as ``1 hour 30 minutes``; the exact number stays available in the result rows."""
+    return format_duration(value, unit, state.registry)
+
+
 def time(values: Mapping[str, Any], state: AppState) -> Outcome:
     setup = optional(values, "setup_time")
     with use_precision(state.precision):
@@ -75,15 +80,16 @@ def time(values: Mapping[str, Any], state: AppState) -> Outcome:
         )
     return Outcome(
         title="Production time",
-        headline=with_unit(r.total_time, r.unit, state),
+        headline=_human(r.total_time, r.unit, state),
         rows=[
-            ("Run time", with_unit(r.run_time, r.unit, state)),
-            ("Setup time", with_unit(r.setup_time, r.unit, state)),
+            ("Exact total", with_unit(r.total_time, r.unit, state)),
+            ("Run time", _human(r.run_time, r.unit, state)),
+            ("Setup time", _human(r.setup_time, r.unit, state)),
             ("Effective rate", "%s per %s" % (fmt(r.effective_rate, state), r.rate_per)),
         ],
         formula=r.formula,
         assumptions=list(r.assumptions),
-        summary="%s units take %s" % (fmt(r.quantity, state), with_unit(r.total_time, r.unit, state)),
+        summary="%s units take %s" % (fmt(r.quantity, state), _human(r.total_time, r.unit, state)),
     )
 
 
@@ -107,7 +113,7 @@ def capacity(values: Mapping[str, Any], state: AppState) -> Outcome:
         title="Production capacity",
         headline="%s units" % fmt(r.quantity, state),
         rows=[
-            ("Productive time", with_unit(r.productive_time, r.time_unit, state)),
+            ("Productive time", _human(r.productive_time, r.time_unit, state)),
             ("Exact figure", fmt(r.exact_quantity, state)),
         ],
         formula=r.formula,
@@ -129,7 +135,7 @@ def batch_capacity(values: Mapping[str, Any], state: AppState) -> Outcome:
             registry=state.registry,
         )
     rows = [
-        ("Leftover time", with_unit(r.leftover_time, r.time_unit, state)),
+        ("Leftover time", _human(r.leftover_time, r.time_unit, state)),
         ("Share of the next batch", fmt(r.next_batch_fraction, state)),
     ]
     if r.quantity is not None:

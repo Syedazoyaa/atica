@@ -53,7 +53,7 @@ def fonts_available() -> bool:
 def apply_application_font(app: Any) -> None:
     """Make IBM Plex Sans the application default (widgets without a stylesheet rule included)."""
     font = QFont(FONT_FAMILY)
-    font.setPixelSize(13)
+    font.setPixelSize(15)
     app.setFont(font)
 
 

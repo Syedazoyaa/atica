@@ -1,6 +1,7 @@
 """Shared infrastructure: exceptions, precision, rounding, validation and result conventions."""
 
 from . import validation
+from .duration import format_duration
 from .exceptions import (
     AticaError,
     CalculationError,
@@ -66,6 +67,7 @@ __all__ = [
     "UnsupportedOperationError",
     "ValidationError",
     "ZeroDenominatorError",
+    "format_duration",
     "get_precision",
     "round_to_multiple",
     "round_value",

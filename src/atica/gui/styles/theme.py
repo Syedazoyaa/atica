@@ -48,6 +48,7 @@ class Theme:
     ink_secondary: str
     ink_placeholder: str
     ink_inverse: str
+    formula: str  # neutral grey for formulas and their explanations
     primary: str
     primary_hover: str
     primary_pressed: str
@@ -77,6 +78,7 @@ LIGHT = Theme(
     ink_secondary="#50545C",
     ink_placeholder="#5C6068",
     ink_inverse="#F3F0F2",
+    formula="#6A6E76",
     primary="#23262B",
     primary_hover="#3A3E46",
     primary_pressed="#101215",
@@ -90,6 +92,10 @@ LIGHT = Theme(
     success_bg="#E4F1E8",
     success_border="#A8D0B4",
 )
+
+#: Falcon Informatics brand colours (from its logo) for the two words of the copyright line.
+FALCON_BLUE = "#2C75B6"
+FALCON_GOLD = "#B88A00"
 
 #: The theme used by Python-side painting (icons, backdrops); the stylesheet gets its own argument.
 CURRENT = LIGHT
@@ -113,14 +119,15 @@ def build_stylesheet(t: Theme = LIGHT) -> str:
 
 
 _TEMPLATE = """
-* {{ font-family: {font}; font-size: 13px; color: {ink}; }}
+* {{ font-family: {font}; font-size: 15px; color: {ink}; }}
 QMainWindow {{ background: {background}; }}
 QWidget#content {{ background: transparent; }}
 QToolTip {{ background: {ink}; color: {ink_inverse}; border: none; padding: 6px 8px; }}
 
 /* ---------- navigation ---------- */
-QLabel#brandTag {{ color: {ink_secondary}; font-size: 11px; }}
-QLabel#sidebarVersion {{ color: {ink_secondary}; font-size: 11px; }}
+QLabel#brandTag {{ color: {ink_secondary}; font-size: 12px; }}
+QLabel#brandName {{ color: {ink}; font-size: 17px; font-weight: 600; letter-spacing: 0.5px; }}
+QLabel#sidebarVersion {{ color: {ink_secondary}; font-size: 12px; }}
 QPushButton#navButton {{
     background: transparent; color: {ink_secondary}; border: none; border-left: 3px solid transparent;
     border-radius: 0; text-align: left; padding: 10px 12px; font-weight: 500;
@@ -133,11 +140,12 @@ QPushButton#navButton:focus {{ outline: none; border: 2px solid {ink}; }}
 QPushButton#navButton[compact="true"] {{ text-align: center; padding: 10px 0; }}
 
 /* ---------- typography ---------- */
-QLabel#pageTitle {{ font-size: 22px; font-weight: 600; color: {ink}; }}
-QLabel#pageSubtitle {{ font-size: 13px; color: {ink_secondary}; }}
-QLabel#cardTitle {{ font-size: 15px; font-weight: 500; color: {ink}; }}
-QLabel#sectionLabel {{ font-size: 11px; font-weight: 500; color: {ink_secondary}; letter-spacing: 1px; }}
+QLabel#pageTitle {{ font-size: 25px; font-weight: 600; color: {ink}; }}
+QLabel#pageSubtitle {{ font-size: 15px; color: {ink_secondary}; }}
+QLabel#cardTitle {{ font-size: 17px; font-weight: 500; color: {ink}; }}
+QLabel#sectionLabel {{ font-size: 12px; font-weight: 500; color: {ink_secondary}; letter-spacing: 0.2px; }}
 QLabel#muted {{ color: {ink_secondary}; }}
+QLabel#formula {{ color: {formula}; }}
 QLabel#fieldLabel {{ color: {ink}; font-weight: 500; }}
 QLabel#unitSuffix {{ color: {ink_secondary}; }}
 QLabel#value {{ color: {ink}; font-weight: 500; }}
@@ -146,7 +154,7 @@ QLabel#value {{ color: {ink}; font-weight: 500; }}
 QFrame#card {{ background: {surface}; border: 1px solid {border}; border-radius: 0; }}
 QFrame#moduleCard {{ background: {surface}; border: 1px solid {border}; border-radius: 0; }}
 QFrame#moduleCard:hover {{ background: {layer}; border: 1px solid {ink}; }}
-QLabel#moduleTitle {{ font-size: 14px; font-weight: 500; color: {ink}; background: transparent; }}
+QLabel#moduleTitle {{ font-size: 16px; font-weight: 500; color: {ink}; background: transparent; }}
 QLabel#moduleText {{ color: {ink_secondary}; background: transparent; }}
 QLabel#iconBadge {{ background: {layer}; border: 1px solid {border}; border-radius: 0; }}
 QFrame#divider {{ background: {border}; max-height: 1px; min-height: 1px; border: none; }}
@@ -222,8 +230,8 @@ QTableCornerButton::section {{ background: {layer}; border: none; }}
 
 /* ---------- results & messages ---------- */
 QFrame#resultHeadline {{ background: {layer}; border: none; border-left: 4px solid {ink}; border-radius: 0; }}
-QLabel#headline {{ font-size: 24px; font-weight: 600; color: {ink}; background: transparent; }}
-QLabel#headlineTitle {{ font-size: 11px; font-weight: 500; color: {ink_secondary}; letter-spacing: 1px; background: transparent; }}
+QLabel#headline {{ font-size: 27px; font-weight: 600; color: {ink}; background: transparent; }}
+QLabel#headlineTitle {{ font-size: 12px; font-weight: 500; color: {ink_secondary}; letter-spacing: 0.2px; background: transparent; }}
 QFrame#bannerError {{ background: {error_bg}; border: 1px solid {error_border}; border-left: 4px solid {error}; border-radius: 0; }}
 QFrame#bannerError QLabel {{ color: {error}; background: transparent; }}
 QFrame#bannerWarning {{ background: {warning_bg}; border: 1px solid {warning_border}; border-left: 4px solid {warning}; border-radius: 0; }}

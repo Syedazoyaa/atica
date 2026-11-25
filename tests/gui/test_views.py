@@ -267,7 +267,7 @@ class TestScreens:
         view.precision.setValue(20)
         assert window.state.display_places == 2 and window.state.precision == 20 and saved[-1] == (2, 20)
         out = window.views["production"].time.calculate()
-        assert out.headline == "4 h"
+        assert out.headline == "4 hours"
 
     def test_settings_actions(self, window):
         window.views["units"].convert_panel.calculate()

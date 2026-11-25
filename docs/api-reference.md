@@ -869,6 +869,20 @@ An input value is missing, malformed or outside its allowed range.
 
 A ratio or percentage would divide by zero.
 
+### `format_duration(value: 'Any', unit: 'str' = 'h', registry: 'Optional[Any]' = None) -> 'str'`
+
+Write ``value`` (a non-negative number of ``unit``) as days, hours, minutes and seconds.
+
+Zero-valued units are left out, labels are singular/plural, and the value is rounded to the
+nearest whole second.  A positive duration under half a second reads ``less than 1 second``.
+
+>>> format_duration("1.5", "h")
+'1 hour 30 minutes'
+>>> format_duration(90, "min")
+'1 hour 30 minutes'
+>>> format_duration(0)
+'0 seconds'
+
 ### `get_precision() -> 'int'`
 
 Return the number of significant digits used for inexact results.

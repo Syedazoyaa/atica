@@ -11,19 +11,20 @@ from typing import List, Optional, Sequence, Tuple
 
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QPainter
-from PySide6.QtWidgets import QButtonGroup, QFrame, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QButtonGroup, QFrame, QPushButton, QVBoxLayout, QWidget
 
 from atica.version import __version__
 
 from ..styles import CURRENT as T
-from ..utils.icons import icon, logo_pixmap, wordmark_pixmap
+from ..utils.icons import icon
 from .backdrop import draw_backdrop
 from .basics import label
+from .brand import BrandBlock
 
 # (section key, title, icon name)
 Section = Tuple[str, str, str]
 
-EXPANDED_WIDTH = 236
+EXPANDED_WIDTH = 264
 COMPACT_WIDTH = 64
 
 
@@ -41,11 +42,9 @@ class Sidebar(QFrame):
         layout.setContentsMargins(12, 20, 12, 14)
         layout.setSpacing(2)
 
-        self._brand = QLabel()
-        self._brand.setAccessibleName("ATICA")
-        self._brand.setContentsMargins(4, 0, 0, 0)
+        self._brand = BrandBlock(64)
         self._tag = label("Manufacturing calculations", "brandTag")
-        self._tag.setContentsMargins(4, 0, 0, 0)
+        self._tag.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._brand)
         layout.addWidget(self._tag)
         layout.addSpacing(18)
@@ -84,7 +83,8 @@ class Sidebar(QFrame):
         """Switch between the expanded and the icon-only layout."""
         self._compact = compact
         self.setFixedWidth(COMPACT_WIDTH if compact else EXPANDED_WIDTH)
-        self._brand.setPixmap(logo_pixmap(32) if compact else wordmark_pixmap(30))
+        self._brand.set_logo_height(34 if compact else 64)
+        self._brand.set_name_visible(not compact)
         self._tag.setVisible(not compact)
         self._version.setVisible(not compact)
         for button, title in zip(self._buttons, self._titles):

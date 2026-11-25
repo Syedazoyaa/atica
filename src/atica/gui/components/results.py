@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib.util
-import os
 from typing import Optional
 
 from PySide6.QtCore import Qt, Signal
@@ -25,6 +24,7 @@ from PySide6.QtWidgets import (
 
 from ..controllers import data_tools
 from ..models import Outcome
+from ..services.exports import suggest_filename, with_extension
 from ..utils.errors import FriendlyError, guard
 from ..utils.icons import icon
 from .basics import Banner, label
@@ -34,6 +34,7 @@ class ResultPanel(QWidget):
     """Shows the outcome (or the error) of the last calculation; offers *Copy* and *Export*."""
 
     exported = Signal(str)
+    module = "RESULT"  # set by the owning panel; used in suggested export filenames
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
@@ -151,12 +152,10 @@ class ResultPanel(QWidget):
             banner = Banner("warning")
             banner.show_message("Warning", text)
             self._notes.addWidget(banner)
-        notes = []
         if outcome.formula:
-            notes.append("Formula: " + outcome.formula)
-        notes += ["Assumption: " + a for a in outcome.assumptions]
-        for text in notes:
-            self._notes.addWidget(label(text, "muted", wrap=True))
+            self._notes.addWidget(label("Formula: " + outcome.formula, "formula", wrap=True))
+        for a in outcome.assumptions:
+            self._notes.addWidget(label("Assumption: " + a, "muted", wrap=True))
         self._actions.show()
 
     @staticmethod
@@ -197,12 +196,12 @@ class ResultPanel(QWidget):
         filters = "CSV file (*.csv)"
         if importlib.util.find_spec("openpyxl") is not None:
             filters += ";;Excel workbook (*.xlsx)"
-        path, chosen = QFileDialog.getSaveFileName(self, "Export result", "atica-result", filters)
+        outcome = self._outcome
+        suggested = suggest_filename(self.module, outcome.title, "csv")
+        path, chosen = QFileDialog.getSaveFileName(self, "Export result", suggested, filters)
         if not path:
             return
-        if not os.path.splitext(path)[1]:
-            path += ".xlsx" if "xlsx" in chosen else ".csv"
-        outcome = self._outcome
+        path = with_extension(path, chosen)
         # the file dialog already asked about overwriting
         saved, err = guard(lambda: data_tools.export_outcome(outcome, path, overwrite=True))
         if err:

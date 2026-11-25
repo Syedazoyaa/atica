@@ -80,7 +80,23 @@ def symbol(fill: str, ink: str, accent: str) -> str:
     )
 
 
+#: Background drawings are deliberately faint; their stroke opacities are scaled by this factor.
+BACKDROP_OPACITY_SCALE = 0.5
+
+
+def _fade(content: str) -> str:
+    import re
+
+    return re.sub(
+        r'stroke-opacity="([0-9.]+)"',
+        lambda m: 'stroke-opacity="%g"' % round(float(m.group(1)) * BACKDROP_OPACITY_SCALE, 3),
+        content,
+    )
+
+
 def write(path: pathlib.Path, content: str) -> None:
+    if path.parent.name == "backgrounds":
+        content = _fade(content)
     path.write_text(content, encoding="utf-8")
     print("wrote", path.relative_to(ROOT), "(%d bytes)" % len(content.encode("utf-8")))
 

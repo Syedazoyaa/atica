@@ -19,3 +19,7 @@ htmlcov/
 # local files a user might create while trying the examples
 quantities.csv
 converted.csv
+
+# local build/test leftovers
+.coverage.*
+*.egg-info/

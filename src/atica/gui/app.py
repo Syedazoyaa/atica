@@ -36,6 +36,7 @@ def create_application(argv: Optional[Sequence[str]] = None) -> QApplication:
     from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication
 
+    from . import branding
     from .styles import LIGHT, build_stylesheet
     from .utils.fonts import apply_application_font, register_fonts
     from .utils.icons import logo_pixmap
@@ -49,7 +50,7 @@ def create_application(argv: Optional[Sequence[str]] = None) -> QApplication:
     app.setProperty("atica.fonts_loaded", register_fonts())
     apply_application_font(app)
     app.setStyleSheet(build_stylesheet(LIGHT))
-    app.setWindowIcon(QIcon(logo_pixmap(64)))
+    app.setWindowIcon(QIcon(branding.brand_pixmap(branding.ATICA_LOGO, 128)) if branding.has_logo(branding.ATICA_LOGO) else QIcon(logo_pixmap(64)))
     return app
 
 

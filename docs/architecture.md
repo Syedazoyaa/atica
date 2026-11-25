@@ -34,7 +34,7 @@ src/atica/
     components/      cards, banners, FormPanel, TableEditor, ResultPanel, Sidebar, CalculatorPanel
     views/           the ten screens
     styles/          design tokens (Theme) + stylesheet generator
-    resources/       icons/ (SVG icons + logos), backgrounds/ (SVG drawings), fonts/ (IBM Plex Sans + OFL licence)
+    resources/       branding/ (ATICA and Falcon Informatics PNG logos), icons/ (SVG icons + fallback logos), backgrounds/ (SVG drawings), fonts/ (IBM Plex Sans + OFL licence)
     utils/           icon/logo loader, font registration, error translation and logging
 tests/               core/ units/ packaging/ materials/ production/ quality/ purchasing/ integration/ gui/
 ```

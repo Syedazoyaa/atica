@@ -60,6 +60,14 @@ class SettingsView(ToolView):
         row.addWidget(clear_activity)
         row.addWidget(reset_units)
         row.addStretch(1)
+        session.body.addWidget(
+            label(
+                "Custom units, the BOM, the packaging product and recent activity are kept for this session only "
+                "and are lost when ATICA closes. The settings above stay saved.",
+                "muted",
+                wrap=True,
+            )
+        )
         session.body.addLayout(row)
         session.body.addWidget(self.banner)
         where = log_path()

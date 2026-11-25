@@ -43,6 +43,27 @@ class TestControllersCallTheCore:
         assert len(calls) == 1 and calls[0][0][:3] == ("212", "F", "C")
         assert out.headline == "100 C"
 
+    @pytest.mark.parametrize(
+        "value, source, target, expected",
+        [
+            ("77", "min", "h", "1 h 17 min"),
+            ("90", "min", "h", "1 h 30 min"),
+            ("135", "min", "h", "2 h 15 min"),
+            ("150", "s", "min", "2 min 30 sec"),
+            ("0.5", "h", "min", "30 min"),
+            ("2.25", "h", "min", "2 h 15 min"),
+            ("3.75", "h", "min", "3 h 45 min"),
+            ("120", "min", "h", "2 h"),
+        ],
+    )
+    def test_time_conversion_headline_uses_compound_duration(
+        self, state, value, source, target, expected
+    ):
+        out = unit_conversion.convert(
+            {"value": value, "from_unit": source, "to_unit": target, "rounding": "none"}, state
+        )
+        assert out.headline == expected
+
     def test_packaging_breakdown_matches_spec_example(self, monkeypatch, state):
         import atica.packaging as packaging
 
@@ -109,7 +130,7 @@ class TestControllersCallTheCore:
                 {"quantity": "1000", "rate": "250", "per": "h", "unit": "min", "efficiency_percent": "100"},
                 state,
             ).headline
-            == "240 min"
+            == "4 hours"
         )
         assert (
             production_calc.capacity(
@@ -200,12 +221,11 @@ class TestControllersCallTheCore:
     def test_display_places_only_affect_display(self, state):
         state.display_places = 2
         out = production_calc.time({"quantity": "1", "rate": "3", "per": "h", "unit": "h"}, state)
-        assert out.headline == "0.33 h"
+        assert dict(out.rows)["Exact total"] == "0.33 h"
+        assert out.headline == "20 minutes"  # human-readable form is independent of display places
         state.display_places = 8
-        assert (
-            production_calc.time({"quantity": "1", "rate": "3", "per": "h", "unit": "h"}, state).headline
-            == "0.33333333 h"
-        )
+        exact = production_calc.time({"quantity": "1", "rate": "3", "per": "h", "unit": "h"}, state)
+        assert dict(exact.rows)["Exact total"] == "0.33333333 h"
 
 
 class TestErrorsComeFromTheCore:

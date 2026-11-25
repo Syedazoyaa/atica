@@ -108,4 +108,4 @@ atica-gui
 
 ## License
 
-ATICA is MIT-licensed - see [LICENSE](LICENSE). The desktop application bundles the **IBM Plex Sans** typeface (© 2017 IBM Corp., SIL Open Font License 1.1); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+ATICA is free software licensed under the **GNU General Public License v3.0** (GPL-3.0) - see [LICENSE](LICENSE). The desktop application bundles the **IBM Plex Sans** typeface (© 2017 IBM Corp., SIL Open Font License 1.1); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

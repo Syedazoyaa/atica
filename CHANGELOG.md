@@ -6,6 +6,15 @@ All notable changes to ATICA. The library and the desktop application share one 
 
 First release as a single product: the calculation library **and** the desktop application in one `pip install atica`. This is a rebuild of 0.8.0; the numbers it produces for valid inputs match 0.8.0 except where 0.8.0 was wrong (see *Corrected*).
 
+### Changed in the release-preparation pass
+
+* **License is now GPL-3.0** (was MIT): `LICENSE` is the full official text, `pyproject.toml` declares `GPL-3.0-only`. IBM Plex Sans keeps its SIL OFL 1.1 licence.
+* Real ATICA and Falcon Informatics logos (`gui/resources/branding/`, one place: `gui/branding.py`) in the window icon, sidebar (logo with the name beneath it) and About; About redesigned (authors, company, links, copyright).
+* Exports are suggested as `ATICA_<MODULE>_<OPERATION>_<YYYYMMDD_HHMMSS>.<ext>` through one helper (`gui/services/exports.py`).
+* New `atica.core.format_duration`: `1.5 h` is shown as `1 hour 30 minutes` in the production results (exact values stay in the result rows and objects).
+* GUI: fonts about 15 % larger, heading letter-spacing reduced, formulas in neutral grey, background drawings at half their former opacity.
+* Formula audit of quality, materials, production, purchasing and units found no discrepancies; independent hand-computed regression values added.
+
 ### Added
 
 * **Desktop application** inside the package (`atica.gui`, command `atica-gui`, `python -m atica`): ten screens, brand design, copy/export, CSV/Excel Data Tools, settings, About. PySide6 is a normal dependency.

@@ -59,6 +59,7 @@ class CalculatorPanel(QWidget):
         self._tool = tool
         self.form = FormPanel(fields, state)
         self.result = ResultPanel()
+        self.result.module = tool
         self.error_banner = Banner("error")
 
         card = Card(title, description)

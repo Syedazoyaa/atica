@@ -23,7 +23,7 @@ from atica.integrations import ConversionReport
 from ..components import Card, FormPanel, label, rounding_fields
 from ..components.basics import Banner
 from ..controllers import data_tools
-from ..services import AppState
+from ..services import AppState, suggest_filename, with_extension
 from ..utils.errors import guard
 from ..utils.icons import icon
 from .base import ToolView
@@ -172,13 +172,11 @@ class DataToolsView(ToolView):
         report = self._report
         if report is None:
             return
-        path, chosen = QFileDialog.getSaveFileName(
-            self, "Export", "atica-errors" if errors else "atica-converted", _export_filter()
-        )
+        suggested = suggest_filename("DATA", "CONVERSION_ERRORS" if errors else "CONVERSION_RESULTS", "csv")
+        path, chosen = QFileDialog.getSaveFileName(self, "Export", suggested, _export_filter())
         if not path:
             return
-        if not os.path.splitext(path)[1]:
-            path += ".xlsx" if "xlsx" in chosen else ".csv"
+        path = with_extension(path, chosen)
         fn = data_tools.export_errors if errors else data_tools.export_report
         saved, err = guard(
             lambda: fn(report, path, overwrite=True)
