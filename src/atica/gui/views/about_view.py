@@ -2,95 +2,139 @@
 
 from __future__ import annotations
 
-import platform
-from typing import Optional
+from typing import Optional, Sequence, Tuple
 
-import PySide6
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QPlainTextEdit, QVBoxLayout, QWidget
+from PySide6.QtCore import QSize, Qt
+from PySide6.QtWidgets import (
+    QBoxLayout,
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QVBoxLayout,
+    QWidget,
+)
 
 from .. import branding as B
 from ..components import Card, label
 from ..components.brand import BrandBlock
 from ..services import AppState
-from ..utils.fonts import fonts_available
 from .base import ToolView
-
-_SNIPPET = """from atica.units import convert
-from atica.packaging import Product, PackagingLevel, breakdown
-
-print(convert(25, "kg", "g"))
-
-product = Product("P001", "Product A", levels=[
-    PackagingLevel("piece"),
-    PackagingLevel("box", 12, "piece"),
-    PackagingLevel("carton", 20, "box"),
-])
-print(breakdown(product, 250, "piece", "carton"))
-"""
-
 
 
 def _link(text: str, url: str) -> QLabel:
     lab = QLabel('<a href="%s">%s</a>' % (url, text))
     lab.setTextFormat(Qt.TextFormat.RichText)
     lab.setOpenExternalLinks(True)
-    lab.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse | Qt.TextInteractionFlag.LinksAccessibleByKeyboard)
+    lab.setTextInteractionFlags(
+        Qt.TextInteractionFlag.LinksAccessibleByMouse | Qt.TextInteractionFlag.LinksAccessibleByKeyboard
+    )
     return lab
 
 
-def _row(name: str, widget: QWidget) -> QHBoxLayout:
-    line = QHBoxLayout()
-    line.addWidget(label(name, "muted"))
-    line.addStretch(1)
-    line.addWidget(widget)
+def _facts(rows: Sequence[Tuple[str, QWidget]]) -> QGridLayout:
+    """Two aligned columns: muted captions, then their values (both left-aligned)."""
+    grid = QGridLayout()
+    grid.setContentsMargins(0, 0, 0, 0)
+    grid.setHorizontalSpacing(28)
+    grid.setVerticalSpacing(8)
+    grid.setColumnMinimumWidth(0, 96)
+    grid.setColumnStretch(1, 1)
+    for row, (name, widget) in enumerate(rows):
+        grid.addWidget(label(name, "muted"), row, 0, Qt.AlignmentFlag.AlignTop)
+        grid.addWidget(widget, row, 1, Qt.AlignmentFlag.AlignTop)
+    return grid
+
+
+def _divider() -> QFrame:
+    line = QFrame()
+    line.setObjectName("divider")
     return line
+
+
+class _CompanyBlock(QWidget):
+    """The company logo beside its contact details; the logo moves above them when space is short."""
+
+    SPACING = 32
+
+    def __init__(self, logo: QLabel, details: QWidget, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self._logo = logo
+        self._details = details
+        self._layout = QBoxLayout(QBoxLayout.Direction.LeftToRight, self)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._layout.setSpacing(self.SPACING)
+        self._layout.addWidget(logo, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self._layout.addWidget(details, 1)
+
+    def minimumSizeHint(self) -> QSize:
+        # only the stacked width is required, otherwise the page could never get narrow enough to stack
+        width = max(self._logo.sizeHint().width(), self._details.minimumSizeHint().width())
+        return QSize(width, self._layout.minimumSize().height())
+
+    def resizeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        super().resizeEvent(event)
+        needed = self._logo.sizeHint().width() + self.SPACING + self._details.sizeHint().width()
+        direction = (
+            QBoxLayout.Direction.LeftToRight if self.width() >= needed else QBoxLayout.Direction.TopToBottom
+        )
+        if direction != self._layout.direction():
+            self._layout.setDirection(direction)
+            self.updateGeometry()
 
 
 class AboutView(ToolView):
     def __init__(self, state: AppState, parent: Optional[QWidget] = None) -> None:
-        super().__init__("About ATICA", B.PRODUCT_DESCRIPTION, state, parent)
+        super().__init__("About ATICA", "Product information, company details and authors.", state, parent)
 
         product = Card("Product")
         top = QHBoxLayout()
         top.setSpacing(24)
         top.addWidget(BrandBlock(96), 0, Qt.AlignmentFlag.AlignTop)
         facts = QVBoxLayout()
+        facts.setSpacing(12)
         facts.addWidget(label(B.PRODUCT_NAME + " " + B.VERSION, "cardTitle"))
         facts.addWidget(label(B.PRODUCT_DESCRIPTION, "muted", wrap=True))
-        for name, value in (
-            ("Version", B.VERSION),
-            ("Initial release", B.INITIAL_RELEASE),
-            ("Updated on", B.UPDATED_ON),
-            ("License", B.LICENSE_NAME),
-        ):
-            facts.addLayout(_row(name, label(value, "value")))
+        facts.addWidget(_divider())
+        facts.addLayout(
+            _facts(
+                [
+                    (name, label(value, "value", wrap=True))
+                    for name, value in (
+                        ("Version", B.VERSION),
+                        ("Initial release", B.INITIAL_RELEASE),
+                        ("Updated on", B.UPDATED_ON),
+                        ("License", B.LICENSE_NAME),
+                    )
+                ]
+            )
+        )
+        facts.addStretch(1)
         top.addLayout(facts, 1)
         product.body.addLayout(top)
 
-        authors = Card("Authors")
-        for i, name in enumerate(B.AUTHORS, 1):
-            authors.body.addWidget(label("%d.  %s" % (i, name), "value"))
-
         company = Card("Company")
-        crow = QHBoxLayout()
-        crow.setSpacing(24)
         logo = QLabel()
         logo.setAccessibleName(B.COMPANY_NAME + " logo")
-        pix = B.brand_pixmap(B.FALCON_LOGO, 64)
+        pix = B.brand_pixmap(B.FALCON_LOGO, 56)
         if pix.isNull():
             logo.setText("[%s logo]" % B.COMPANY_NAME)
         else:
             logo.setPixmap(pix)
-        crow.addWidget(logo, 0, Qt.AlignmentFlag.AlignTop)
-        details = QVBoxLayout()
-        details.addWidget(label(B.COMPANY_NAME, "cardTitle"))
-        details.addLayout(_row("Website", _link(B.COMPANY_WEBSITE, B.COMPANY_WEBSITE)))
-        details.addLayout(_row("LinkedIn", _link(B.COMPANY_LINKEDIN, B.COMPANY_LINKEDIN)))
-        for mail in B.COMPANY_EMAILS:
-            details.addLayout(_row("Email", _link(mail, "mailto:" + mail)))
-        crow.addLayout(details, 1)
-        company.body.addLayout(crow)
+        details = QWidget()
+        column = QVBoxLayout(details)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(10)
+        column.addWidget(label(B.COMPANY_NAME, "cardTitle"))
+        contacts = [
+            ("Website", _link(B.COMPANY_WEBSITE, B.COMPANY_WEBSITE)),
+            ("LinkedIn", _link(B.COMPANY_LINKEDIN, B.COMPANY_LINKEDIN)),
+        ]
+        for i, mail in enumerate(B.COMPANY_EMAILS):
+            contacts.append(("Email" if i == 0 else "", _link(mail, "mailto:" + mail)))
+        column.addLayout(_facts(contacts))
+        company.body.addWidget(_CompanyBlock(logo, details))
+        company.body.addWidget(_divider())
         copyright_label = QLabel(
             '© <span style="color:%s;font-weight:600">Falcon</span> '
             '<span style="color:%s;font-weight:600">Informatics</span>.%s'
@@ -100,17 +144,8 @@ class AboutView(ToolView):
         copyright_label.setAccessibleName("Copyright")
         company.body.addWidget(copyright_label)
 
-        env = Card("Environment")
-        for name, value in (
-            ("Python", platform.python_version()),
-            ("PySide6 / Qt", PySide6.__version__),
-            ("Platform", platform.platform()),
-            (
-                "Interface typeface",
-                "IBM Plex Sans" + ("" if fonts_available() else " (not loaded, using a system font)"),
-            ),
-        ):
-            env.body.addLayout(_row(name, label(value, "value")))
+        authors = Card("Authors")
+        authors.body.addWidget(label(", ".join(B.AUTHORS), wrap=True))
 
         licences = Card("Licences")
         licences.body.addWidget(
@@ -121,39 +156,12 @@ class AboutView(ToolView):
                 wrap=True,
             )
         )
-        licences.body.addWidget(
-            label(
-                "The interface typeface is IBM Plex Sans, © 2017 IBM Corp. with Reserved Font Name “Plex”, "
-                "bundled unmodified under the SIL Open Font License 1.1 (see THIRD_PARTY_NOTICES.md and "
-                "atica/gui/resources/fonts/OFL.txt). The GUI is built with Qt for Python (PySide6).",
-                "muted",
-                wrap=True,
-            )
-        )
-
-        session = Card("Your data")
-        session.body.addWidget(
-            label(
-                "Custom units, the imported or edited BOM, the packaging product and the activity list are kept "
-                "for this session only and are lost when ATICA closes. Settings (display decimal places and "
-                "calculation precision) stay saved.",
-                "muted",
-                wrap=True,
-            )
-        )
-
-        use = Card("Use the same calculations from Python")
-        code = QPlainTextEdit(_SNIPPET)
-        code.setReadOnly(True)
-        code.setFixedHeight(250)
-        code.setAccessibleName("Python example")
-        use.body.addWidget(code)
 
         holder = QWidget()
         lay = QVBoxLayout(holder)
         lay.setContentsMargins(0, 2, 8, 14)
         lay.setSpacing(12)
-        for card in (product, authors, company, session, env, use, licences):
+        for card in (product, company, authors, licences):
             lay.addWidget(card)
         lay.addStretch(1)
         self.add_scrolling_tab("About", holder)

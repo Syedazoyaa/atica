@@ -96,6 +96,7 @@ LIGHT = Theme(
 #: Falcon Informatics brand colours (from its logo) for the two words of the copyright line.
 FALCON_BLUE = "#2C75B6"
 FALCON_GOLD = "#B88A00"
+FALCON_BROWN = "#8B4513"
 
 #: The theme used by Python-side painting (icons, backdrops); the stylesheet gets its own argument.
 CURRENT = LIGHT
@@ -111,6 +112,7 @@ def build_stylesheet(t: Theme = LIGHT) -> str:
     """Return the application stylesheet for theme ``t``."""
     values = dict(t.__dict__)
     values.update(
+        FALCON_BROWN=FALCON_BROWN,
         font=FONT_STACK,
         chevron=asset_url("chevron_down.svg"),
         check=asset_url("check.svg"),
@@ -139,6 +141,7 @@ QToolButton#titleBarClose:hover, QToolButton#titleBarClose:pressed {{
 /* ---------- navigation ---------- */
 QLabel#brandTag {{ color: {ink_secondary}; font-size: 12px; }}
 QLabel#brandName {{ color: {ink}; font-size: 17px; font-weight: 600; letter-spacing: 0.5px; }}
+QLabel#sidebarCompany {{ color: {FALCON_BROWN}; font-size: 13px; font-weight: 600; letter-spacing: 0.8px; }}
 QLabel#sidebarVersion {{ color: {ink_secondary}; font-size: 12px; }}
 QPushButton#navButton {{
     background: transparent; color: {ink_secondary}; border: none; border-left: 3px solid transparent;
@@ -150,6 +153,7 @@ QPushButton#navButton:checked {{
 }}
 QPushButton#navButton:focus {{ outline: none; border: 2px solid {ink}; }}
 QPushButton#navButton[compact="true"] {{ text-align: center; padding: 10px 0; }}
+QPushButton#navButton[short="true"] {{ padding-top: 4px; padding-bottom: 4px; }}
 
 /* ---------- typography ---------- */
 QWidget#pageHeader {{ background: transparent; min-height: 30px; max-height: 30px; }}
@@ -188,12 +192,18 @@ QLineEdit[invalid="true"], QComboBox[invalid="true"] {{
 }}
 QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled {{ background: {background}; color: {ink_placeholder}; }}
 QLineEdit[readOnly="true"] {{ background: {background}; }}
+/* combobox-popup: 0 makes Qt draw the list itself, so the item colours below apply (not the OS blue) */
+QComboBox {{ combobox-popup: 0; }}
 QComboBox::drop-down {{ border: none; width: 28px; }}
 QComboBox::down-arrow {{ image: {chevron}; width: 12px; height: 12px; }}
 QComboBox QAbstractItemView {{
     background: {surface}; border: 1px solid {ink}; selection-background-color: {accent}; selection-color: {ink};
     outline: none; padding: 2px;
 }}
+QComboBox QAbstractItemView::item {{ min-height: 28px; padding: 0 8px; border: none; }}
+QComboBox QAbstractItemView::item:hover {{ background: {layer}; color: {ink}; }}
+QComboBox QAbstractItemView::item:selected {{ background: {accent}; color: {ink}; }}
+QComboBox QAbstractItemView::item:disabled {{ background: transparent; color: {ink_placeholder}; }}
 QSpinBox::up-button, QSpinBox::down-button {{ width: 0; border: none; }}
 QCheckBox {{ spacing: 8px; }}
 QCheckBox:focus {{ outline: none; }}

@@ -297,8 +297,13 @@ class TestDashboard:
         dashboard = window.views["dashboard"]
         title = next(w for w in dashboard.findChildren(QLabel) if w.objectName() == "pageTitle")
         assert (
-            title.text() == "Dashboard" and title.mapTo(dashboard, title.rect().topLeft()).y() < 40
+            title.text() == "Calculations. Simplified." and title.mapTo(dashboard, title.rect().topLeft()).y() < 40
         )  # no reclaimed gap
+        texts = " ".join(w.text() for w in dashboard.findChildren(QLabel))
+        assert (
+            "An integrated toolkit for smarter manufacturing, precision calculations, and industrial workflows."
+            in texts
+        )
 
     def test_shows_modules_quick_calculations_version_and_real_activity_only(self, window):
         dashboard = window.views["dashboard"]

@@ -149,14 +149,21 @@ class MainWindow(QMainWindow):
         self._resize_edges: Optional[Qt.Edges] = None
         self._resize_origin: Optional[QPoint] = None
         self._resize_geometry: Optional[QRect] = None
-        QApplication.instance().installEventFilter(self)
 
     def showEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         super().showEvent(event)
+        # edge resizing needs the mouse events of every child widget, but only while the window is on screen
+        QApplication.instance().installEventFilter(self)
         if not self._focus_set:
             # start without a keyboard-focus ring on the first navigation button; Tab still reaches everything
             self._focus_set = True
             self.centralWidget().setFocus(Qt.FocusReason.OtherFocusReason)
+
+    def hideEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        # also runs on close: an application-wide filter must not outlive the visible window
+        QApplication.instance().removeEventFilter(self)
+        self._end_resize()
+        super().hideEvent(event)
 
     def changeEvent(self, event: QEvent) -> None:
         super().changeEvent(event)
@@ -164,21 +171,25 @@ class MainWindow(QMainWindow):
             self.title_bar.set_maximized(self.isMaximized())
 
     def eventFilter(self, watched, event) -> bool:  # type: ignore[no-untyped-def]
+        # The filter sees every object in the application, including ones being destroyed: look at the
+        # event first, and answer False without handing unrelated objects back to Qt.
+        if event.type() not in (
+            QEvent.Type.MouseMove,
+            QEvent.Type.MouseButtonPress,
+            QEvent.Type.MouseButtonRelease,
+        ):
+            return False
         if not isinstance(watched, QWidget) or watched.window() is not self:
-            return super().eventFilter(watched, event)
-        if event.type() not in (QEvent.Type.MouseMove, QEvent.Type.MouseButtonPress, QEvent.Type.MouseButtonRelease):
-            return super().eventFilter(watched, event)
+            return False
         mouse_event = event
         if not isinstance(mouse_event, QMouseEvent):
-            return super().eventFilter(watched, event)
+            return False
         if self._resize_edges is not None:
             if event.type() == QEvent.Type.MouseMove:
                 self._resize_from(mouse_event.globalPosition().toPoint())
                 return True
             if event.type() == QEvent.Type.MouseButtonRelease:
-                self._resize_edges = None
-                self._resize_origin = None
-                self._resize_geometry = None
+                self._end_resize()
                 return True
         edges = self._resize_edges_at(mouse_event.globalPosition().toPoint())
         if event.type() == QEvent.Type.MouseMove:
@@ -190,7 +201,7 @@ class MainWindow(QMainWindow):
             and self._start_resize(edges, mouse_event.globalPosition().toPoint())
         ):
             return True
-        return super().eventFilter(watched, event)
+        return False
 
     def _resize_edges_at(self, global_pos: QPoint) -> Qt.Edges:
         if self.isMaximized() or self.isFullScreen():
@@ -229,6 +240,11 @@ class MainWindow(QMainWindow):
         self._resize_origin = global_pos
         self._resize_geometry = self.geometry()
         return True
+
+    def _end_resize(self) -> None:
+        self._resize_edges = None
+        self._resize_origin = None
+        self._resize_geometry = None
 
     def _resize_from(self, global_pos: QPoint) -> None:
         if self._resize_edges is None or self._resize_origin is None or self._resize_geometry is None:

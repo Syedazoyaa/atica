@@ -20,7 +20,7 @@ atica-gui          # or: python -m atica
 | Purchasing Calculations | `atica.purchasing.calculate_purchase_quantity` |
 | Data Tools | `atica.integrations` - convert a CSV/Excel file, import a BOM, export converted/problem rows |
 | Settings | display decimals (display only) and calculation precision (`use_precision`) |
-| About | version, environment, a Python snippet |
+| About | product description, version, company details, authors, licence |
 
 Each calculator shows labelled inputs with tooltips, sensible defaults and a **Calculate** button (Enter also works), a result card with the headline answer, details, tables, warnings, the formula and assumptions, and **Copy result** / **Export...** (CSV, or Excel when `openpyxl` is installed). **Reset** restores the defaults. The BOM and the packaging hierarchy are entered once and shared between screens. Custom units you define appear in every unit list for the session.
 

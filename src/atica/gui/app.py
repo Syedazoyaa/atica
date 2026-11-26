@@ -33,7 +33,7 @@ usage: atica-gui [--version] [--check] [--help]
 def create_application(argv: Optional[Sequence[str]] = None) -> QApplication:
     """Create (or reuse) the ``QApplication`` and apply the ATICA name, icon and stylesheet."""
     from PySide6.QtCore import QCoreApplication
-    from PySide6.QtGui import QIcon
+    from PySide6.QtGui import QColor, QIcon, QPalette
     from PySide6.QtWidgets import QApplication
 
     from . import branding
@@ -49,6 +49,11 @@ def create_application(argv: Optional[Sequence[str]] = None) -> QApplication:
     # IBM Plex Sans ships inside the package: register it before the stylesheet names it
     app.setProperty("atica.fonts_loaded", register_fonts())
     apply_application_font(app)
+    # selections use the theme accent instead of the operating system's blue
+    palette = app.palette()
+    palette.setColor(QPalette.ColorRole.Highlight, QColor(LIGHT.accent))
+    palette.setColor(QPalette.ColorRole.HighlightedText, QColor(LIGHT.ink))
+    app.setPalette(palette)
     app.setStyleSheet(build_stylesheet(LIGHT))
     app.setWindowIcon(QIcon(branding.brand_pixmap(branding.ATICA_LOGO, 128)) if branding.has_logo(branding.ATICA_LOGO) else QIcon(logo_pixmap(64)))
     return app

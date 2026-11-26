@@ -11,6 +11,20 @@ from ..models import Outcome
 from ..services import AppState, fmt, with_unit
 from ._common import checked, optional, rounding_args, val
 
+#: How the Unit Converter writes time units. Display only: the library's unit symbols are unchanged.
+TIME_NOTATION = {"d": "dd", "h": "hh", "min": "min", "s": "ss"}
+#: The words of :func:`atica.core.format_duration`, in the same notation.
+_DURATION_WORDS = {
+    word + plural: TIME_NOTATION[symbol]
+    for word, symbol in (("day", "d"), ("hour", "h"), ("minute", "min"), ("second", "s"))
+    for plural in ("", "s")
+}
+
+
+def notation(symbol: str) -> str:
+    """The unit symbol as the Unit Converter shows it."""
+    return TIME_NOTATION.get(symbol, symbol)
+
 
 def convert(values: Mapping[str, Any], state: AppState) -> Outcome:
     rounding, places = rounding_args(values)
@@ -24,38 +38,29 @@ def convert(values: Mapping[str, Any], state: AppState) -> Outcome:
             interval=checked(values, "interval"),
             registry=state.registry,
         )
+    source_unit, unit = notation(result.source_unit), notation(result.unit)
     outcome = Outcome(
         title="Unit conversion",
-        headline=with_unit(result.value, result.unit, state),
+        headline=with_unit(result.value, unit, state),
         rows=[
-            ("Input", with_unit(result.source_value, result.source_unit, state)),
+            ("Input", with_unit(result.source_value, source_unit, state)),
             ("Measures", result.category),
         ],
         formula=result.formula,
         warnings=list(result.warnings),
         summary="%s = %s"
         % (
-            with_unit(result.source_value, result.source_unit, state),
-            with_unit(result.value, result.unit, state),
+            with_unit(result.source_value, source_unit, state),
+            with_unit(result.value, unit, state),
         ),
     )
     if result.category == "time":
-        abbreviations = {
-            "day": "d",
-            "days": "d",
-            "hour": "h",
-            "hours": "h",
-            "minute": "min",
-            "minutes": "min",
-            "second": "sec",
-            "seconds": "sec",
-        }
         outcome.headline = " ".join(
-            abbreviations.get(part, part)
+            _DURATION_WORDS.get(part, part)
             for part in format_duration(result.value, result.unit, state.registry).split()
         )
     if result.rounding.value != "none":
-        outcome.rows.append(("Exact value", with_unit(result.exact_value, result.unit, state)))
+        outcome.rows.append(("Exact value", with_unit(result.exact_value, unit, state)))
         outcome.rows.append(
             ("Rounding", "%s, %d decimal places" % (result.rounding.value.replace("_", " "), result.places))
         )
@@ -74,7 +79,7 @@ def define_unit(values: Mapping[str, Any], state: AppState) -> Outcome:
     )
     state.changed()
     ratio = units.convert(1, unit.symbol, val(values, "reference_unit"), registry=state.registry)  # type: ignore[arg-type]
-    text = "1 %s = %s %s" % (unit.symbol, fmt(ratio.value, state), ratio.unit)
+    text = "1 %s = %s %s" % (unit.symbol, fmt(ratio.value, state), notation(ratio.unit))
     return Outcome(
         title="Custom unit defined",
         headline=text,

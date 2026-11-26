@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
@@ -37,11 +37,17 @@ class UnitCombo(QComboBox):
         self._state = state
         self._kinds = tuple(kinds)
         self._compact = compact
+        self._notation: Mapping[str, str] = {}
         self.setMaxVisibleItems(16)
         self.refresh()
 
     def set_kinds(self, kinds: Sequence[str]) -> None:
         self._kinds = tuple(kinds)
+        self.refresh()
+
+    def set_notation(self, notation: Mapping[str, str]) -> None:
+        """Show some symbols differently; :meth:`symbol` still returns the library's own symbol."""
+        self._notation = notation
         self.refresh()
 
     def refresh(self) -> None:
@@ -60,10 +66,9 @@ class UnitCombo(QComboBox):
                 item = self.model().item(self.count() - 1)  # type: ignore[attr-defined]
                 item.setFlags(Qt.ItemFlag.NoItemFlags)
             for unit in units:
+                shown = self._notation.get(unit.symbol, unit.symbol)
                 text = (
-                    unit.symbol
-                    if (self._compact or unit.name == unit.symbol)
-                    else "%s  ·  %s" % (unit.symbol, unit.name)
+                    shown if (self._compact or unit.name == unit.symbol) else "%s  ·  %s" % (shown, unit.name)
                 )
                 self.addItem(text, unit.symbol)
                 self.setItemData(self.count() - 1, unit.name, Qt.ItemDataRole.ToolTipRole)

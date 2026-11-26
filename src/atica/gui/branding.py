@@ -25,16 +25,13 @@ RATIO = 3
 
 # ------------------------------------------------------------------ product metadata
 PRODUCT_NAME = "ATICA"
-PRODUCT_DESCRIPTION = (
-    "Manufacturing calculations for Python developers and for people who prefer a window to a script: "
-    "unit conversion, packaging, materials and BOM, production, quality and yield, and purchasing."
-)
+PRODUCT_DESCRIPTION = "An integrated toolkit for smarter manufacturing, precision calculations, and industrial workflows."
 VERSION = __version__
 #: Not confirmed yet - replace with the real date (e.g. "2026-12-01") when it is known.
-INITIAL_RELEASE = "To be announced"
-UPDATED_ON = "25 November 2026"
+INITIAL_RELEASE = "27 November 2026"
+UPDATED_ON = "27 November 2026"
 LICENSE_NAME = "GNU General Public License v3.0 (GPL-3.0)"
-AUTHORS = ("Zabiullah Khan", "Syeda Zoya", "Juveria Talha", "Insiya Maryam", "RajuKumar Allam", "Sasi")
+AUTHORS = ("Zabiullah Khan", "Syeda Zoya", "Juveria Talha", "Insiya Maryam", "RajuKumar Allam", "Sasi Kumar A")
 
 # ------------------------------------------------------------------ company metadata
 COMPANY_NAME = "Falcon Informatics"

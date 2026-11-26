@@ -62,7 +62,7 @@ def test_branding_assets_present_and_metadata():
 
 @pytest.mark.gui
 def test_logos_keep_aspect_and_about_content(qapp):
-    from PySide6.QtWidgets import QLabel
+    from PySide6.QtWidgets import QLabel, QPlainTextEdit
 
     from atica.gui.services import AppState
     from atica.gui.views.about_view import AboutView
@@ -73,10 +73,20 @@ def test_logos_keep_aspect_and_about_content(qapp):
     assert B.logo_size(B.ATICA_LOGO, 100)[0] < 200  # transparent margin trimmed (raw is 1.79:1)
     view = AboutView(AppState())
     text = " ".join(lab.text() for lab in view.findChildren(QLabel))
+    assert B.PRODUCT_DESCRIPTION == (
+        "An integrated toolkit for smarter manufacturing, precision calculations, and industrial workflows."
+    )
+    assert B.PRODUCT_DESCRIPTION in text
     needles = (*B.AUTHORS, "mailto:info@falconinformatics.com", "mailto:cs@falconinformatics.com")
     for needle in (*needles, B.COMPANY_WEBSITE, B.COMPANY_LINKEDIN, "GPL-3.0", "All rights reserved."):
         assert needle in text, needle
     assert "MIT" not in text
+    for removed in ("Environment", "Your data", "SIL Open Font License", "from Python"):
+        assert removed not in text, removed
+    titles = [lab.text() for lab in view.findChildren(QLabel) if lab.objectName() == "cardTitle"]
+    assert titles.index("Company") < titles.index("Authors")
+    assert ", ".join(B.AUTHORS) in text
+    assert not view.findChildren(QPlainTextEdit)
 
 
 @pytest.mark.gui

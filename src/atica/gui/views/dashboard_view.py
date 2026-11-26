@@ -105,9 +105,12 @@ class ResponsiveGrid(QWidget):
         for c in range(self._max_columns):
             self._grid.setColumnStretch(c, 1 if c < columns else 0)
 
+    def columns_for(self, width: int) -> int:
+        return max(1, min(self._max_columns, width // self._min_cell))
+
     def resizeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         super().resizeEvent(event)
-        columns = max(1, min(self._max_columns, self.width() // self._min_cell))
+        columns = self.columns_for(self.width())
         if columns != self._columns:
             self._relayout(columns)
 
@@ -145,11 +148,10 @@ class DashboardView(BackdropWidget):
         head = QHBoxLayout()
         titles = QVBoxLayout()
         titles.setSpacing(4)
-        titles.addWidget(PageHeader("Dashboard", "dashboard"))
+        titles.addWidget(PageHeader("Calculations. Simplified.", "dashboard"))
         titles.addWidget(
             label(
-                "Exact manufacturing calculations: units, packaging, materials, production, quality and purchasing. "
-                "The same engine is available in Python (import atica).",
+                "An integrated toolkit for smarter manufacturing, precision calculations, and industrial workflows.",
                 "pageSubtitle",
                 wrap=True,
             )

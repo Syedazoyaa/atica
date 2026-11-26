@@ -27,6 +27,11 @@ from .base import ToolView
 _CATEGORY_ALL = ("All quantity types", "")
 
 
+def _use_time_notation(widget: QWidget) -> None:
+    assert isinstance(widget, UnitCombo)
+    widget.set_notation(unit_conversion.TIME_NOTATION)
+
+
 class UnitsView(ToolView):
     def __init__(self, state: AppState, parent: Optional[QWidget] = None) -> None:
         super().__init__(
@@ -87,6 +92,8 @@ class UnitsView(ToolView):
             extra_bottom=[swap],
         )
         form = panel.form
+        for key in ("from_unit", "to_unit"):
+            _use_time_notation(form.widget(key))
 
         def on_category() -> None:
             category = form.values()["category"]
@@ -145,7 +152,8 @@ class UnitsView(ToolView):
         table.verticalHeader().setVisible(False)
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         table.setMinimumHeight(150)
         self._custom_banner = Banner("error")
         holder = QWidget()
@@ -164,6 +172,7 @@ class UnitsView(ToolView):
             extra_bottom=[holder],
             button_text="Define unit",
         )
+        _use_time_notation(panel.form.widget("reference_unit"))
         return panel
 
     def _refresh(self) -> None:
@@ -176,13 +185,19 @@ class UnitsView(ToolView):
             ref, ratio = unit.definition if unit.definition else (unit.symbol, 1)
             table.setItem(row, 0, QTableWidgetItem(unit.symbol))
             table.setItem(
-                row, 1, QTableWidgetItem("1 %s = %s %s  (%s)" % (unit.symbol, ratio, ref, unit.category))
+                row,
+                1,
+                QTableWidgetItem(
+                    "1 %s = %s %s  (%s)" % (unit.symbol, ratio, unit_conversion.notation(ref), unit.category)
+                ),
             )
             button = QPushButton(" Remove")
             button.setObjectName("danger")
             button.setIcon(icon("trash", CURRENT.error, 14))
             button.clicked.connect(lambda _c=False, name=unit.symbol: self._remove(name))
             table.setCellWidget(row, 2, button)
+            button.ensurePolished()  # the size must include the stylesheet's padding and font
+            table.setColumnWidth(2, button.sizeHint().width() + 8)
 
     def _remove(self, name: str) -> None:
         self._custom_banner.hide()

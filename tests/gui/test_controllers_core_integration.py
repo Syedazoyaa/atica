@@ -46,14 +46,14 @@ class TestControllersCallTheCore:
     @pytest.mark.parametrize(
         "value, source, target, expected",
         [
-            ("77", "min", "h", "1 h 17 min"),
-            ("90", "min", "h", "1 h 30 min"),
-            ("135", "min", "h", "2 h 15 min"),
-            ("150", "s", "min", "2 min 30 sec"),
+            ("77", "min", "h", "1 hh 17 min"),
+            ("90", "min", "h", "1 hh 30 min"),
+            ("135", "min", "h", "2 hh 15 min"),
+            ("150", "s", "min", "2 min 30 ss"),
             ("0.5", "h", "min", "30 min"),
-            ("2.25", "h", "min", "2 h 15 min"),
-            ("3.75", "h", "min", "3 h 45 min"),
-            ("120", "min", "h", "2 h"),
+            ("2.25", "h", "min", "2 hh 15 min"),
+            ("3.75", "h", "min", "3 hh 45 min"),
+            ("120", "min", "h", "2 hh"),
         ],
     )
     def test_time_conversion_headline_uses_compound_duration(
@@ -63,6 +63,37 @@ class TestControllersCallTheCore:
             {"value": value, "from_unit": source, "to_unit": target, "rounding": "none"}, state
         )
         assert out.headline == expected
+
+    @pytest.mark.parametrize(
+        "value, source, target, expected",
+        [
+            ("1", "d", "h", "1 dd"),
+            ("36", "h", "d", "1 dd 12 hh"),
+            ("1", "d", "min", "1 dd"),
+            ("1", "d", "s", "1 dd"),
+            ("90061", "s", "d", "1 dd 1 hh 1 min 1 ss"),
+            ("5400", "s", "h", "1 hh 30 min"),
+        ],
+    )
+    def test_time_notation_covers_day_hour_minute_second(self, state, value, source, target, expected):
+        out = unit_conversion.convert(
+            {"value": value, "from_unit": source, "to_unit": target, "rounding": "none"}, state
+        )
+        assert out.headline == expected
+        shown = unit_conversion.TIME_NOTATION
+        assert dict(out.rows)["Input"] == "%s %s" % (value, shown[source])
+        assert out.summary.startswith("%s %s = " % (value, shown[source])) and out.summary.endswith(shown[target])
+
+    def test_time_notation_is_only_a_label_in_the_unit_converter(self, window):
+        from atica.gui.components import UnitCombo
+
+        form = window.views["units"].convert_panel.form
+        combo = form.widget("from_unit")
+        for symbol, text in (("d", "dd"), ("h", "hh"), ("min", "min"), ("s", "ss"), ("kg", "kg")):
+            assert combo.set_symbol(symbol) and combo.currentText().startswith(text + "  ·  ")
+            assert combo.symbol() == symbol  # the library still receives its own symbol
+        elsewhere = UnitCombo(window.state, ("time",))
+        assert elsewhere.set_symbol("h") and elsewhere.currentText() == "h  ·  Hour"
 
     def test_packaging_breakdown_matches_spec_example(self, monkeypatch, state):
         import atica.packaging as packaging

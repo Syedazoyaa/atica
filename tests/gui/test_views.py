@@ -341,3 +341,35 @@ class TestApplication:
         )
         out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
         assert out.stdout.strip() == "False"
+
+
+def test_edge_resize_filter_is_active_only_while_the_window_is_visible(window, monkeypatch):
+    from PySide6.QtCore import QEvent, QPointF, Qt
+    from PySide6.QtGui import QMouseEvent
+    from PySide6.QtWidgets import QApplication
+
+    started = []
+    monkeypatch.setattr(window, "_start_resize", lambda edges, pos: started.append(edges) or True)
+
+    def press_left_edge() -> int:
+        started.clear()
+        corner = window.geometry().topLeft()
+        spot = QPointF(corner.x() + 1, corner.y() + 200)
+        press = QMouseEvent(
+            QEvent.Type.MouseButtonPress,
+            QPointF(1, 200),
+            spot,
+            Qt.MouseButton.LeftButton,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+        )
+        QApplication.sendEvent(window.sidebar, press)  # a child widget, as with a real mouse
+        return len(started)
+
+    assert press_left_edge() == 1
+    window.hide()
+    assert press_left_edge() == 0
+    window.show()
+    assert press_left_edge() == 1
+    window.close()
+    assert press_left_edge() == 0

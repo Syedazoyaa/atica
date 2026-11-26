@@ -1,8 +1,9 @@
-"""Navigation sidebar: ATICA wordmark, section buttons and the product version.
+"""Navigation sidebar: ATICA wordmark, section buttons, company name and product version.
 
 The sidebar has two widths: *expanded* (icons and titles) and *compact* (icons only, titles in
 tooltips).  The main window switches to compact automatically on narrow screens - for example a
-1366 x 768 laptop at 150 % scaling has only about 910 logical pixels of width.
+1366 x 768 laptop at 150 % scaling has only about 910 logical pixels of width.  On short windows the
+sidebar also shrinks the brand block and the button padding so that nothing is squeezed.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from PySide6.QtWidgets import QButtonGroup, QFrame, QPushButton, QVBoxLayout, QW
 
 from atica.version import __version__
 
+from .. import branding as B
 from ..styles import CURRENT as T
 from ..utils.icons import icon
 from .backdrop import draw_backdrop
@@ -26,6 +28,8 @@ Section = Tuple[str, str, str]
 
 EXPANDED_WIDTH = 264
 COMPACT_WIDTH = 64
+#: below this sidebar height the small brand block and tighter navigation buttons are used
+SHORT_BELOW = 660
 
 
 class Sidebar(QFrame):
@@ -38,6 +42,7 @@ class Sidebar(QFrame):
         self.setObjectName("sidebar")
         self._titles = [title for _key, title, _icon in sections]
         self._compact = False
+        self._short = False
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 20, 12, 14)
         layout.setSpacing(2)
@@ -68,9 +73,17 @@ class Sidebar(QFrame):
             self._icon_names.append(icon_name)
             layout.addWidget(button)
         layout.addStretch(1)
-        self._version = label("Version " + __version__, "sidebarVersion")
-        self._version.setContentsMargins(4, 0, 0, 0)
-        layout.addWidget(self._version)
+        self._footer = QWidget()
+        footer = QVBoxLayout(self._footer)
+        footer.setContentsMargins(4, 0, 4, 0)
+        footer.setSpacing(2)
+        rule = QFrame()
+        rule.setObjectName("divider")
+        footer.addWidget(rule)
+        footer.addSpacing(6)
+        footer.addWidget(label(B.COMPANY_NAME.upper(), "sidebarCompany"))
+        footer.addWidget(label("Version " + __version__, "sidebarVersion"))
+        layout.addWidget(self._footer)
         self.set_compact(False)
         self._refresh_icons(-1)
 
@@ -83,15 +96,28 @@ class Sidebar(QFrame):
         """Switch between the expanded and the icon-only layout."""
         self._compact = compact
         self.setFixedWidth(COMPACT_WIDTH if compact else EXPANDED_WIDTH)
-        self._brand.set_logo_height(34 if compact else 64)
-        self._brand.set_name_visible(not compact)
-        self._tag.setVisible(not compact)
-        self._version.setVisible(not compact)
         for button, title in zip(self._buttons, self._titles):
             button.setText("" if compact else "  " + title)
-            button.setProperty("compact", compact)
+        self._footer.setVisible(not compact)
+        self._apply_density()
+
+    def _apply_density(self) -> None:
+        small = self._compact or self._short
+        self._brand.set_logo_height(34 if small else 64)
+        self._brand.set_name_visible(not small)
+        self._tag.setVisible(not small)
+        for button in self._buttons:
+            button.setProperty("compact", self._compact)
+            button.setProperty("short", self._short)
             button.style().unpolish(button)
             button.style().polish(button)
+
+    def resizeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        super().resizeEvent(event)
+        short = self.height() < SHORT_BELOW
+        if short != self._short:
+            self._short = short
+            self._apply_density()
 
     def select(self, index: int) -> None:
         self._refresh_icons(index)
