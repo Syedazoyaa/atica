@@ -305,10 +305,20 @@ class TestDashboard:
             in texts
         )
 
-    def test_shows_modules_quick_calculations_version_and_real_activity_only(self, window):
+    def test_page_header_icons_align_with_descriptions_for_all_pages(self, window):
+        from PySide6.QtCore import QPoint
+
+        window.show()
+        for view in window.views.values():
+            header = view.findChild(QWidget, "pageHeader")
+            subtitle = view.findChild(QLabel, "pageSubtitle")
+            icon = header.findChild(QLabel, "pageHeaderIcon")
+            assert icon.mapTo(view, QPoint(0, 0)).x() == subtitle.mapTo(view, QPoint(0, 0)).x()
+
+    def test_shows_modules_quick_calculations_and_real_activity_only(self, window):
         dashboard = window.views["dashboard"]
         assert len(dashboard.modules_grid._items) == 7 and len(dashboard.quick_grid._items) == 5
-        assert atica.__version__ in " ".join(label.text() for label in dashboard.findChildren(QLabel))
+        assert "Version " not in " ".join(label.text() for label in dashboard.findChildren(QLabel))
         assert window.state.activity == []
         assert "Nothing yet" in " ".join(label.text() for label in dashboard.findChildren(QLabel))
 

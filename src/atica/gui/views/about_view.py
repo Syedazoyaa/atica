@@ -85,7 +85,7 @@ class _CompanyBlock(QWidget):
 
 class AboutView(ToolView):
     def __init__(self, state: AppState, parent: Optional[QWidget] = None) -> None:
-        super().__init__("About ATICA", "Product information, company details and authors.", state, parent)
+        super().__init__("About ATICA", "An integrated toolkit for smarter manufacturing, precision calculations, and industrial workflows.", state, parent)
 
         product = Card("Product")
         top = QHBoxLayout()

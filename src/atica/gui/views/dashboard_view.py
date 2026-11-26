@@ -21,8 +21,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from atica.version import __version__
-
 from ..components import Card, label
 from ..components.backdrop import BackdropWidget
 from ..services import AppState
@@ -148,7 +146,7 @@ class DashboardView(BackdropWidget):
         head = QHBoxLayout()
         titles = QVBoxLayout()
         titles.setSpacing(4)
-        titles.addWidget(PageHeader("Calculations. Simplified.", "dashboard"))
+        titles.addWidget(PageHeader("Manufacturing Calculations Simplified.", "dashboard"))
         titles.addWidget(
             label(
                 "An integrated toolkit for smarter manufacturing, precision calculations, and industrial workflows.",
@@ -157,7 +155,6 @@ class DashboardView(BackdropWidget):
             )
         )
         head.addLayout(titles, 1)
-        head.addWidget(label("Version " + __version__, "muted"), 0, Qt.AlignmentFlag.AlignTop)
         lay.addLayout(head)
         lay.addSpacing(6)
 

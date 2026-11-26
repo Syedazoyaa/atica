@@ -36,7 +36,7 @@ class PageHeader(QWidget):
         self.setObjectName("pageHeader")
         self.setFixedHeight(self.HEIGHT)
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(16, 0, 0, 0)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
         mark = label("", "pageHeaderIcon")
         mark.setPixmap(pixmap(icon_name, T.ink, 18))
