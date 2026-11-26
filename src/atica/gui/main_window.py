@@ -8,7 +8,6 @@ from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt
 from PySide6.QtGui import QAction, QKeySequence, QMouseEvent
 from PySide6.QtWidgets import QApplication, QHBoxLayout, QMainWindow, QStackedWidget, QVBoxLayout, QWidget
 
-
 from .components import Sidebar, TitleBar
 from .services import AppState
 from .views import (

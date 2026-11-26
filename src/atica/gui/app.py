@@ -55,7 +55,11 @@ def create_application(argv: Optional[Sequence[str]] = None) -> QApplication:
     palette.setColor(QPalette.ColorRole.HighlightedText, QColor(LIGHT.ink))
     app.setPalette(palette)
     app.setStyleSheet(build_stylesheet(LIGHT))
-    app.setWindowIcon(QIcon(branding.brand_pixmap(branding.ATICA_LOGO, 128)) if branding.has_logo(branding.ATICA_LOGO) else QIcon(logo_pixmap(64)))
+    app.setWindowIcon(
+        QIcon(branding.brand_pixmap(branding.ATICA_LOGO, 128))
+        if branding.has_logo(branding.ATICA_LOGO)
+        else QIcon(logo_pixmap(64))
+    )
     return app
 
 

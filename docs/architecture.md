@@ -34,7 +34,7 @@ src/atica/
     components/      cards, banners, FormPanel, TableEditor, ResultPanel, Sidebar, CalculatorPanel
     views/           the ten screens
     styles/          design tokens (Theme) + stylesheet generator
-    resources/       branding/ (ATICA and Falcon Informatics PNG logos), icons/ (SVG icons + fallback logos), backgrounds/ (SVG drawings), fonts/ (IBM Plex Sans + OFL licence)
+    resources/       branding/ (ATICA and Falcon Informatics PNG logos), icons/ (SVG icons + fallback logos), backgrounds/ (SVG drawings), fonts/ (interface font and its licence file)
     utils/           icon/logo loader, font registration, error translation and logging
 tests/               core/ units/ packaging/ materials/ production/ quality/ purchasing/ integration/ gui/
 ```
@@ -48,7 +48,7 @@ tests/               core/ units/ packaging/ materials/ production/ quality/ pur
 * **No dynamic execution, no network, no implicit files.** Tests assert the package contains no `eval`/`exec`/`pickle`/`subprocess`/`socket` and that the core imports only the standard library. Files are touched only by the explicit integration functions.
 * **Thread safety.** Results, products, BOMs and unit definitions are immutable, and precision is context-local, so calculations can run in parallel. The only mutable object, `UnitRegistry`, serialises *writes* (registering/removing units) with a lock; reads are not locked, so finish registering custom units before sharing a registry across threads (or give each thread its own `registry.copy()`). The shared default registry is read-only.
 * **Lazy Qt.** `import atica` and `import atica.gui` (models, services, controllers) never import PySide6; `atica.gui.app.main` imports it on demand and turns a broken Qt install into a readable message.
-* **Theming.** All colours are tokens in `gui/styles/theme.py::Theme` and all text uses the bundled IBM Plex Sans; a dark theme is another `Theme` instance (the stylesheet, icons and backdrops are generated from the tokens).
+* **Theming.** All colours are tokens in `gui/styles/theme.py::Theme` and all text uses the bundled interface font; a dark theme is another `Theme` instance (the stylesheet, icons and backdrops are generated from the tokens).
 * **Responsive layout.** The main window picks its size from the screen; the sidebar collapses to icons and calculators fold into one scrolling column on narrow windows, so nothing depends on fixed pixel sizes.
 
 ## Complexity

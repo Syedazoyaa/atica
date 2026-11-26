@@ -3,8 +3,8 @@
 Run from the repository root (needs PySide6 installed):  python docs/_make_brand_assets.py
 
 * ``logo.svg`` / ``logo_light.svg``                 - the "A" symbol for light / dark backgrounds;
-* ``logo_wordmark.svg`` / ``logo_wordmark_light.svg`` - symbol + the word ATICA set in IBM Plex Sans
-  SemiBold and converted to outlines, so the logo is pure vector and needs no font at render time;
+* ``logo_wordmark.svg`` / ``logo_wordmark_light.svg`` - symbol + the word ATICA set in the bundled
+  interface font (SemiBold) and converted to outlines, so the logo is pure vector and needs no font at render time;
 * ``backgrounds/*.svg``                             - subtle engineering-drawing backdrops.
 
 The palette values below are the ATICA identity colours and must match ``gui/styles/theme.py``.

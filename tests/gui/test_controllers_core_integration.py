@@ -56,9 +56,7 @@ class TestControllersCallTheCore:
             ("120", "min", "h", "2 hh"),
         ],
     )
-    def test_time_conversion_headline_uses_compound_duration(
-        self, state, value, source, target, expected
-    ):
+    def test_time_conversion_headline_uses_compound_duration(self, state, value, source, target, expected):
         out = unit_conversion.convert(
             {"value": value, "from_unit": source, "to_unit": target, "rounding": "none"}, state
         )
@@ -82,7 +80,9 @@ class TestControllersCallTheCore:
         assert out.headline == expected
         shown = unit_conversion.TIME_NOTATION
         assert dict(out.rows)["Input"] == "%s %s" % (value, shown[source])
-        assert out.summary.startswith("%s %s = " % (value, shown[source])) and out.summary.endswith(shown[target])
+        assert out.summary.startswith("%s %s = " % (value, shown[source])) and out.summary.endswith(
+            shown[target]
+        )
 
     def test_time_notation_is_only_a_label_in_the_unit_converter(self, window):
         from atica.gui.components import UnitCombo

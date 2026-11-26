@@ -55,7 +55,7 @@ def test_branding_assets_present_and_metadata():
         "Juveria Talha",
         "Insiya Maryam",
         "RajuKumar Allam",
-        "Sasi",
+        "Sasi Kumar A",
     )
     assert B.COMPANY_EMAILS == ("info@falconinformatics.com", "cs@falconinformatics.com")
 
@@ -112,6 +112,21 @@ def test_backdrops_are_faint():
     for f in d.glob("*.svg"):
         ops = [float(x) for x in re.findall(r'stroke-opacity="([0-9.]+)"', f.read_text(encoding="utf-8"))]
         assert ops and max(ops) <= 0.30, f.name
+
+
+def test_package_authors_match_the_about_page():
+    block = (ROOT / "pyproject.toml").read_text(encoding="utf-8").split("authors = [", 1)[1].split("]", 1)[0]
+    assert tuple(re.findall(r'name = "([^"]+)"', block)) == B.AUTHORS
+
+
+def test_version_is_declared_once():
+    from atica.version import __version__
+
+    project = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert 'dynamic = ["version"]' in project and not re.search(r"^version\s*=", project, re.M)
+    assert __version__ == B.VERSION
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert re.search(r"^## %s " % re.escape(__version__), changelog, re.M), "no changelog entry"
 
 
 def test_license_is_gpl3():

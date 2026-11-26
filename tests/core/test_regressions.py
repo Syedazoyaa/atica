@@ -1,4 +1,4 @@
-"""Regression tests for the 1.0.0 release-hardening pass."""
+"""Regression tests: each one pins a defect that was found and fixed."""
 
 from decimal import Decimal
 from fractions import Fraction
@@ -208,7 +208,7 @@ class TestRequiredInputWithReworkIsExact:
         ],
     )
     def test_reduced_precision_does_not_leak_a_rounded_yield_into_the_answer(self, target, fpy, expected):
-        """0.8.x/1.0.0-pre divided by an already-rounded yield: at 6 digits 1 / (1/7) came out as 7.00001."""
+        """Earlier development builds divided by an already-rounded yield: at 6 digits 1 / (1/7) came out as 7.00001."""
         from atica.core import use_precision
 
         with use_precision(6):

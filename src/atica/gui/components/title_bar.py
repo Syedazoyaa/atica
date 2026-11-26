@@ -66,7 +66,11 @@ class TitleBar(QWidget):
         return button
 
     def set_maximized(self, maximized: bool) -> None:
-        icon = QStyle.StandardPixmap.SP_TitleBarNormalButton if maximized else QStyle.StandardPixmap.SP_TitleBarMaxButton
+        icon = (
+            QStyle.StandardPixmap.SP_TitleBarNormalButton
+            if maximized
+            else QStyle.StandardPixmap.SP_TitleBarMaxButton
+        )
         self.maximize_button.setIcon(self.style().standardIcon(icon))
         self.maximize_button.setToolTip("Restore" if maximized else "Maximize")
         self.maximize_button.setAccessibleName("Restore" if maximized else "Maximize")

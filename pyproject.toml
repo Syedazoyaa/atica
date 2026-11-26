@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling>=1.21"]
+requires = ["hatchling>=1.27"]  # PEP 639 license expression and license-files
 build-backend = "hatchling.build"
 
 [project]
@@ -16,7 +16,7 @@ authors = [
     { name = "Juveria Talha" },
     { name = "Insiya Maryam" },
     { name = "RajuKumar Allam" },
-    { name = "Sasi" },
+    { name = "Sasi Kumar A" },
 ]
 maintainers = [{ name = "Falcon Informatics", email = "info@falconinformatics.com" }]
 keywords = ["manufacturing", "unit conversion", "packaging", "bill of materials", "yield", "scrap", "decimal", "pyside6"]
@@ -37,6 +37,13 @@ classifiers = [
 # The calculation core uses only the standard library. PySide6 is required because the
 # desktop GUI ships in the same distribution and `pip install atica` must provide both.
 dependencies = ["PySide6>=6.5,<7"]
+
+[project.urls]
+Homepage = "https://github.com/Syedazoyaa/atica"
+Repository = "https://github.com/Syedazoyaa/atica"
+Documentation = "https://github.com/Syedazoyaa/atica/tree/main/docs"
+Changelog = "https://github.com/Syedazoyaa/atica/blob/main/CHANGELOG.md"
+Issues = "https://github.com/Syedazoyaa/atica/issues"
 
 [project.optional-dependencies]
 excel = ["openpyxl>=3.0"]

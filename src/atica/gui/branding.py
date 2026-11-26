@@ -25,13 +25,21 @@ RATIO = 3
 
 # ------------------------------------------------------------------ product metadata
 PRODUCT_NAME = "ATICA"
-PRODUCT_DESCRIPTION = "An integrated toolkit for smarter manufacturing, precision calculations, and industrial workflows."
+PRODUCT_DESCRIPTION = (
+    "An integrated toolkit for smarter manufacturing, precision calculations, and industrial workflows."
+)
 VERSION = __version__
-#: Not confirmed yet - replace with the real date (e.g. "2026-12-01") when it is known.
 INITIAL_RELEASE = "27 November 2026"
 UPDATED_ON = "27 November 2026"
 LICENSE_NAME = "GNU General Public License v3.0 (GPL-3.0)"
-AUTHORS = ("Zabiullah Khan", "Syeda Zoya", "Juveria Talha", "Insiya Maryam", "RajuKumar Allam", "Sasi Kumar A")
+AUTHORS = (
+    "Zabiullah Khan",
+    "Syeda Zoya",
+    "Juveria Talha",
+    "Insiya Maryam",
+    "RajuKumar Allam",
+    "Sasi Kumar A",
+)
 
 # ------------------------------------------------------------------ company metadata
 COMPANY_NAME = "Falcon Informatics"

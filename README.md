@@ -79,7 +79,7 @@ pip install atica
 atica-gui
 ```
 
-(`python -m atica` does the same.) Ten sections: Dashboard, Unit Converter, Packaging, Materials and BOM, Production, Quality and Yield, Purchasing, Data Tools, Settings, About. A light, flat, engineering-style interface in IBM Plex Sans (bundled - nothing to install) that adapts to laptop screens and Windows display scaling. Every screen calls the public functions listed in this README - the GUI contains no formulas of its own. See [docs/gui.md](docs/gui.md).
+(`python -m atica` does the same.) Ten sections: Dashboard, Unit Converter, Packaging, Materials and BOM, Production, Quality and Yield, Purchasing, Data Tools, Settings, About. A light, flat, engineering-style interface that adapts to laptop screens and Windows display scaling. Every screen calls the public functions listed in this README - the GUI contains no formulas of its own. See [docs/gui.md](https://github.com/Syedazoyaa/atica/blob/main/docs/gui.md).
 
 ## Calculation domains
 
@@ -102,10 +102,10 @@ atica-gui
 
 ## Documentation
 
-* [Getting started](docs/getting-started.md) - [Units](docs/units.md) - [Packaging](docs/packaging.md) - [Materials & BOM](docs/materials.md) - [Production](docs/production.md) - [Quality](docs/quality.md) - [Purchasing](docs/purchasing.md) - [Integrations](docs/integrations.md)
-* [Core: precision, rounding, results, errors](docs/core.md) - [Architecture](docs/architecture.md) - [Desktop app](docs/gui.md)
-* [API reference](docs/api-reference.md) (generated from the source) - [Formulas](docs/formulas.md) - [Changelog](CHANGELOG.md) - [Release checklist](docs/release-checklist.md)
+* [Getting started](https://github.com/Syedazoyaa/atica/blob/main/docs/getting-started.md) - [Units](https://github.com/Syedazoyaa/atica/blob/main/docs/units.md) - [Packaging](https://github.com/Syedazoyaa/atica/blob/main/docs/packaging.md) - [Materials & BOM](https://github.com/Syedazoyaa/atica/blob/main/docs/materials.md) - [Production](https://github.com/Syedazoyaa/atica/blob/main/docs/production.md) - [Quality](https://github.com/Syedazoyaa/atica/blob/main/docs/quality.md) - [Purchasing](https://github.com/Syedazoyaa/atica/blob/main/docs/purchasing.md) - [Integrations](https://github.com/Syedazoyaa/atica/blob/main/docs/integrations.md)
+* [Core: precision, rounding, results, errors](https://github.com/Syedazoyaa/atica/blob/main/docs/core.md) - [Architecture](https://github.com/Syedazoyaa/atica/blob/main/docs/architecture.md) - [Desktop app](https://github.com/Syedazoyaa/atica/blob/main/docs/gui.md)
+* [API reference](https://github.com/Syedazoyaa/atica/blob/main/docs/api-reference.md) (generated from the source) - [Formulas](https://github.com/Syedazoyaa/atica/blob/main/docs/formulas.md) - [Changelog](https://github.com/Syedazoyaa/atica/blob/main/CHANGELOG.md) - [Release checklist](https://github.com/Syedazoyaa/atica/blob/main/docs/release-checklist.md)
 
 ## License
 
-ATICA is free software licensed under the **GNU General Public License v3.0** (GPL-3.0) - see [LICENSE](LICENSE). The desktop application bundles the **IBM Plex Sans** typeface (© 2017 IBM Corp., SIL Open Font License 1.1); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+ATICA is free software licensed under the **GNU General Public License v3.0** (GPL-3.0) - see [LICENSE](https://github.com/Syedazoyaa/atica/blob/main/LICENSE). Notices for third-party material are in [THIRD_PARTY_NOTICES.md](https://github.com/Syedazoyaa/atica/blob/main/THIRD_PARTY_NOTICES.md).

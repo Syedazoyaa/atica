@@ -66,7 +66,12 @@ def test_wastage_denominators():
 def test_purchasing_moq_never_forces_unneeded_order():
     assert calculate_purchase_quantity(10, stock_on_hand=15, minimum_order_quantity=100).order_quantity == 0
     r = calculate_purchase_quantity(
-        "2.5", unit="kg", stock_on_hand="0.5", minimum_order_quantity=500, order_multiple=750, purchase_unit="g"
+        "2.5",
+        unit="kg",
+        stock_on_hand="0.5",
+        minimum_order_quantity=500,
+        order_multiple=750,
+        purchase_unit="g",
     )
     assert r.net_requirement == 2000 and r.order_quantity == 2250  # ceil(2000/750) = 3 x 750
 

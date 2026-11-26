@@ -1,25 +1,36 @@
+# Python
 __pycache__/
 *.py[cod]
+*.egg-info/
+
+# virtual environments
+.venv/
+venv/
+env/
+
+# tool caches and coverage
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .hypothesis/
-.venv/
-venv/
-env/
-build/
-dist/
-*.egg-info/
 .coverage
+.coverage.*
 coverage.xml
 htmlcov/
+
+# build output (wheel, sdist, PyInstaller, installers)
+build/
+dist/
+
+# logs, editors, operating system
+*.log
 .idea/
 .vscode/
-*.log
-# local files a user might create while trying the examples
+.DS_Store
+Thumbs.db
+Desktop.ini
+*~
+
+# files a user might create while trying the examples
 quantities.csv
 converted.csv
-
-# local build/test leftovers
-.coverage.*
-*.egg-info/

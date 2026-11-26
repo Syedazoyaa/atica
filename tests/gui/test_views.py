@@ -49,8 +49,9 @@ class TestWindowStructure:
         assert window.stack.currentWidget() is window.views["packaging"]
 
     def test_version_is_the_single_package_version(self, window):
-        import atica
         from PySide6.QtWidgets import QLabel
+
+        import atica
         from atica.version import __version__
 
         assert atica.__version__ == __version__

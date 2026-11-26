@@ -108,10 +108,10 @@ class TestPalette:
     def test_semantic_colours_only_where_they_carry_meaning(self):
         css = build_stylesheet(LIGHT)
         for token in (LIGHT.error, LIGHT.warning, LIGHT.success):
-            # only banners, invalid inputs and the danger button may use them
+            # only banners, invalid inputs, the danger button and the window's close button may use them
             for block in re.findall(r"([^{}]+)\{([^{}]*)\}", css):
                 if token in block[1]:
-                    assert re.search(r"banner|invalid|danger", block[0], re.I), block[0].strip()
+                    assert re.search(r"banner|invalid|danger|titleBarClose", block[0], re.I), block[0].strip()
 
 
 class TestTypography:
@@ -133,7 +133,7 @@ class TestTypography:
         )
         notices = pathlib.Path(atica.__file__).resolve().parents[2] / "THIRD_PARTY_NOTICES.md"
         if notices.exists():  # present in the source tree / sdist
-            assert "IBM Plex Sans" in notices.read_text(encoding="utf-8")
+            assert "resources/fonts/OFL.txt" in notices.read_text(encoding="utf-8")
 
     def test_only_ibm_plex_sans_is_named_in_the_code(self):
         for path in GUI_ROOT.rglob("*.py"):
@@ -297,7 +297,8 @@ class TestDashboard:
         dashboard = window.views["dashboard"]
         title = next(w for w in dashboard.findChildren(QLabel) if w.objectName() == "pageTitle")
         assert (
-            title.text() == "Calculations. Simplified." and title.mapTo(dashboard, title.rect().topLeft()).y() < 40
+            title.text() == "Manufacturing Calculations Simplified."
+            and title.mapTo(dashboard, title.rect().topLeft()).y() < 40
         )  # no reclaimed gap
         texts = " ".join(w.text() for w in dashboard.findChildren(QLabel))
         assert (
