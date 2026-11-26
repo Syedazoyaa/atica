@@ -7,6 +7,13 @@ atica-gui          # or: python -m atica
 
 `atica-gui --version` prints the version; `atica-gui --check` starts the application, creates the main window and exits (a quick installation self-test; set `QT_QPA_PLATFORM=offscreen` on a machine without a display).
 
+## Behaviour worth knowing
+
+* **Start-up.** The window opens maximized (not full screen). It is titled ATICA; the footer reads "ATICA - Manufacturing Calculations".
+* **Drop-down lists.** The mouse wheel scrolls the page. It changes a drop-down only while its list is open.
+* **Messages and results.** An error disappears when you edit a field it is about. A result is cleared as soon as an input, the BOM, the packaging hierarchy, a custom unit or a display setting that it used changes.
+* **BOM import.** All invalid rows and columns are reported at once and nothing is imported.
+
 ## Screens
 
 | Screen | Core API it calls |

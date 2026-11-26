@@ -7,7 +7,8 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple, cast
 
-from ..core.exceptions import AticaError, IntegrationError
+from ..core import validation
+from ..core.exceptions import AticaError, IntegrationError, MissingInputError
 from ..core.results import Result
 from ..core.rounding import Rounding
 from ..materials import Bom, BomItem
@@ -198,7 +199,11 @@ def bom_from_rows(
     row_numbers: Optional[Sequence[int]] = None,
 ) -> Bom:
     """Build a :class:`~atica.materials.Bom` from rows with ``material_id, quantity_per_unit, unit``
-    (optional ``wastage_percent`` and ``name``).  Any invalid row raises with its row number."""
+    (optional ``wastage_percent`` and ``name``).
+
+    Nothing is returned unless every row is valid.  Otherwise one :class:`IntegrationError` reports **all**
+    invalid rows and columns (also available as ``error.errors``, a tuple of :class:`RowError`).
+    """
     if not rows:
         raise IntegrationError("The file contains no BOM rows.", parameter="rows")
     names: Set[str] = set()
@@ -212,20 +217,81 @@ def bom_from_rows(
             hint="Required columns: %s (optional: wastage_percent, name)." % ", ".join(BOM_COLUMNS),
         )
     items: List[BomItem] = []
+    problems: List[RowError] = []
     for index, row in enumerate(rows):
         number = row_numbers[index] if row_numbers else index + 1
-        try:
-            items.append(
-                BomItem(
-                    str(row.get("material_id", "")),
-                    cast(Any, str(row.get("quantity_per_unit", "")).strip()),
-                    str(row.get("unit", "")),
-                    cast(Any, str(row.get("wastage_percent") or "0").strip()),
-                    str(row.get("name") or ""),
+        values: Tuple[str, str, str, str, str] = (
+            str(row.get("material_id", "")),
+            str(row.get("quantity_per_unit", "")).strip(),
+            str(row.get("unit", "")),
+            str(row.get("wastage_percent") or "0").strip(),
+            str(row.get("name") or ""),
+        )
+        found = _bom_field_errors(number, *values[:4])
+        if not found:
+            try:
+                items.append(
+                    BomItem(values[0], cast(Any, values[1]), values[2], cast(Any, values[3]), values[4])
                 )
-            )
-        except AticaError as exc:
-            raise IntegrationError(
-                "Row %d: %s" % (number, exc.message), parameter="rows", hint=exc.hint
-            ) from exc
+            except AticaError as exc:
+                found = [_bom_error(number, exc)]
+        problems.extend(found)
+    if problems:
+        raise _bom_import_error(problems)
     return Bom(tuple(items), product_id=product_id, allow_duplicates=allow_duplicates)
+
+
+#: how many problems the message lists; ``errors`` on the exception always holds all of them
+_MAX_LISTED = 50
+
+
+def _bom_error(number: int, exc: AticaError) -> RowError:
+    return RowError(number, exc.message, exc.code, exc.hint)
+
+
+def _bom_field_errors(
+    number: int, material_id: str, quantity: str, unit: str, wastage: str
+) -> List[RowError]:
+    """Check each column on its own (with the same rules as :class:`BomItem`) so that none hides another."""
+    found: List[RowError] = []
+    for name, value in (
+        ("material_id", material_id),
+        ("quantity_per_unit", quantity),
+        ("unit", unit),
+        ("wastage_percent", wastage),
+    ):
+        try:
+            _check_bom_value(name, value)
+        except AticaError as exc:
+            message, hint = exc.message, exc.hint
+            if "is not a valid number" in message:
+                message, hint = "%s: %r is not a valid number." % (name, value), None
+            found.append(RowError(number, message, exc.code, hint))
+    return found
+
+
+def _check_bom_value(name: str, value: str) -> None:
+    if name == "quantity_per_unit":
+        if not value:
+            raise MissingInputError("%s is empty; enter a number." % name, parameter=name)
+        validation.positive(value, name)
+    elif name == "wastage_percent":
+        validation.percentage(value, name, allow_100=False)
+    else:
+        validation.text(value, name, max_length=64)
+
+
+def _bom_import_error(problems: Sequence[RowError]) -> IntegrationError:
+    lines = ["Row %d: %s" % (p.row_number, p.message) for p in problems]
+    if len(lines) == 1:
+        error = IntegrationError(lines[0], parameter="rows", hint=problems[0].hint)
+    else:
+        if len(lines) > _MAX_LISTED:
+            lines = [*lines[:_MAX_LISTED], "... and %d more." % (len(problems) - _MAX_LISTED)]
+        error = IntegrationError(
+            "%d problems found; nothing was imported.\n%s" % (len(problems), "\n".join(lines)),
+            parameter="rows",
+            hint="Correct these rows in the file and import it again.",
+        )
+    error.errors = tuple(problems)  # type: ignore[attr-defined]
+    return error

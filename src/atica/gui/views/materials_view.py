@@ -87,6 +87,7 @@ class MaterialsView(ToolView):
             state,
             tool="BOM",
             extra_top=[explain, self.bom, buttons, self._import_banner],
+            depends_on=lambda: state.bom_rows,
         )
         self.stock = TableEditor(
             ["Material", "Available", "Unit"], state, unit_columns={2: _MATERIAL_KINDS}, min_height=150
@@ -125,6 +126,7 @@ class MaterialsView(ToolView):
             tool="BOM",
             description="Enter the stock on hand for EVERY material; a missing material is never assumed to be zero or unlimited.",
             extra_top=[fill_row, self.stock],
+            depends_on=lambda: state.bom_rows,
         )
         self.add_tab("Requirements", self.requirements)
         self.add_tab("Capacity from stock", self.capacity)
@@ -132,7 +134,10 @@ class MaterialsView(ToolView):
 
     # ---------------------------------------------------------------- handlers
     def _bom_edited(self) -> None:
+        self._import_banner.hide()  # an import problem is out of date once the table is edited
         self.state.bom_rows = self.bom.rows()
+        self.requirements.discard_stale_result()
+        self.capacity.discard_stale_result()
 
     def _run_requirements(self, values: Dict[str, Any]):  # type: ignore[no-untyped-def]
         self.state.bom_rows = self.bom.rows()

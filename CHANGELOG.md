@@ -25,6 +25,12 @@ First release: the calculation library **and** the desktop application in one `p
 * Light, flat interface that adapts to narrow and short windows and to Windows display scaling; keyboard operable.
 * The Unit Converter writes time units as `dd`, `hh`, `min` and `ss`.
 
+* Opens maximized; the window is named ATICA, with "ATICA - Manufacturing Calculations" in the footer.
+* The mouse wheel scrolls the page and never changes a closed drop-down list.
+* A validation message disappears when the input it is about is edited; results are cleared when anything they were calculated from changes.
+* Validation messages use the labels shown on screen.
+* A BOM file with problems is not imported, and every invalid row and column is reported together.
+
 ### License
 
 GNU General Public License v3.0 (GPL-3.0-only).

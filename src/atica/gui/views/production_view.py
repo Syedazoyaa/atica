@@ -48,6 +48,7 @@ class ProductionView(ToolView):
             state,
             tool="Production",
             description="Full batches, the partial last batch, and the batches required to cover the quantity.",
+            depends_on=lambda: state.bom_rows if self.batches.form.values()["include_materials"] else None,
         )
         self.time = CalculatorPanel(
             "Production time",

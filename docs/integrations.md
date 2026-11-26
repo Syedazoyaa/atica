@@ -36,3 +36,9 @@ Unit conversion files need the columns `value`, `from_unit`, `to_unit` (names ca
 * Limits: 50 MB and 100 000 data rows per file.
 * Existing files are never overwritten unless `overwrite=True`; the output folder must exist.
 * Text cells that begin with `= + - @` are neutralised on export (leading apostrophe) so a spreadsheet cannot execute them as formulas; real numbers are left alone.
+
+## BOM files with problems
+
+`read_bom_csv` and `read_bom_xlsx` import all rows or none. When rows are invalid they raise one `IntegrationError`
+whose message lists every problem with its row number and column; `error.errors` holds the same information as
+`RowError` objects (`row_number`, `message`, `code`, `hint`).

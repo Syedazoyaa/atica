@@ -25,6 +25,8 @@ RATIO = 3
 
 # ------------------------------------------------------------------ product metadata
 PRODUCT_NAME = "ATICA"
+#: the descriptive line shown in the footer of the main window
+APP_FOOTER = "ATICA - Manufacturing Calculations"
 PRODUCT_DESCRIPTION = (
     "An integrated toolkit for smarter manufacturing, precision calculations, and industrial workflows."
 )

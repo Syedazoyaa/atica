@@ -40,6 +40,7 @@ def create_application(argv: Optional[Sequence[str]] = None) -> QApplication:
     from .styles import LIGHT, build_stylesheet
     from .utils.fonts import apply_application_font, register_fonts
     from .utils.icons import logo_pixmap
+    from .utils.wheel_guard import install_wheel_guard
 
     QCoreApplication.setOrganizationName("ATICA")
     QCoreApplication.setApplicationName("ATICA")
@@ -55,6 +56,7 @@ def create_application(argv: Optional[Sequence[str]] = None) -> QApplication:
     palette.setColor(QPalette.ColorRole.HighlightedText, QColor(LIGHT.ink))
     app.setPalette(palette)
     app.setStyleSheet(build_stylesheet(LIGHT))
+    install_wheel_guard(app)
     app.setWindowIcon(
         QIcon(branding.brand_pixmap(branding.ATICA_LOGO, 128))
         if branding.has_logo(branding.ATICA_LOGO)
@@ -80,6 +82,11 @@ def build_window(state: Optional[AppState] = None) -> MainWindow:
     state = state or AppState()
     load_settings(state)
     return MainWindow(state)
+
+
+def show_main_window(window: MainWindow) -> None:
+    """Open the window maximized (not full screen): the taskbar stays and restore/minimize keep working."""
+    window.showMaximized()
 
 
 def _install_excepthook() -> None:
@@ -127,7 +134,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             LOG.warning("The bundled IBM Plex Sans font could not be loaded; using a system font.")
         _install_excepthook()
         window = build_window()
-        window.show()
+        show_main_window(window)
         if "--check" in args:
             from PySide6.QtCore import QTimer
 

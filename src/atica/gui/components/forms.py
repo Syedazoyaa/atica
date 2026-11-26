@@ -122,6 +122,8 @@ class FormPanel(QWidget):
     """Builds labelled input controls from :class:`Field` descriptions and reads them back as a dict."""
 
     submitted = Signal()  # Enter pressed in a text box
+    edited = Signal(str)  # the key of the field whose value changed
+    field_hidden = Signal(str)  # the key of a field that a mode or option has just hidden
 
     def __init__(self, fields: Sequence[Field], state: AppState, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
@@ -200,6 +202,14 @@ class FormPanel(QWidget):
                 box.addLayout(row)
             else:
                 box.addWidget(widget)
+        changed = (
+            widget.textChanged
+            if isinstance(widget, QLineEdit)
+            else widget.toggled
+            if isinstance(widget, QCheckBox)
+            else widget.currentIndexChanged  # type: ignore[attr-defined]
+        )
+        changed.connect(lambda *_a, key=f.key: self.edited.emit(key))
         widget.setToolTip(f.tooltip)
         widget.setObjectName("field_" + f.key)
         self._widgets[f.key] = widget
@@ -268,6 +278,22 @@ class FormPanel(QWidget):
         if keep and current is not None and combo.findData(current) >= 0:
             combo.setCurrentIndex(combo.findData(current))
 
+    def labels(self) -> Dict[str, str]:
+        return {key: f.label for key, f in self._fields.items()}
+
+    def number_fields_in_use(self) -> List[Tuple[str, str, str]]:
+        """``(key, label, text)`` of every number box that takes part in the calculation (not hidden)."""
+        out = []
+        for key, f in self._fields.items():
+            w = self._widgets[key]
+            if f.kind == "number" and isinstance(w, QLineEdit) and not self._containers[key].isHidden():
+                out.append((key, f.label, w.text().strip()))
+        return out
+
+    def is_blank(self, key: str) -> bool:
+        w = self._widgets.get(key)
+        return isinstance(w, QLineEdit) and not w.text().strip()
+
     def label_for(self, key: str) -> Optional[str]:
         field = self._fields.get(key)
         return field.label if field else None
@@ -279,6 +305,8 @@ class FormPanel(QWidget):
 
     def set_visible(self, key: str, visible: bool) -> None:
         self._containers[key].setVisible(visible)
+        if not visible:
+            self.field_hidden.emit(key)
 
     # --------------------------------------------------------------- validation
     def highlight(self, key: Optional[str]) -> bool:

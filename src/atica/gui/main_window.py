@@ -6,8 +6,17 @@ from typing import Dict, List, Optional
 
 from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt
 from PySide6.QtGui import QAction, QKeySequence, QMouseEvent
-from PySide6.QtWidgets import QApplication, QHBoxLayout, QMainWindow, QStackedWidget, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
+from . import branding
 from .components import Sidebar, TitleBar
 from .services import AppState
 from .views import (
@@ -87,7 +96,7 @@ class MainWindow(QMainWindow):
     def __init__(self, state: Optional[AppState] = None) -> None:
         super().__init__()
         self.state = state or AppState()
-        self.setWindowTitle("ATICA - Manufacturing Calculations")
+        self.setWindowTitle(branding.PRODUCT_NAME)
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
         # Sized from the screen, not fixed: a 1366 x 768 laptop at 150 % scaling offers only ~910 x 510
         # logical pixels, so the minimum must stay small and the layout must adapt (see resizeEvent).
@@ -121,7 +130,15 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.addWidget(self.sidebar)
-        layout.addWidget(self.stack, 1)
+        self.footer = QLabel(branding.APP_FOOTER)
+        self.footer.setObjectName("appFooter")
+        self.footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        page = QVBoxLayout()
+        page.setContentsMargins(0, 0, 0, 0)
+        page.setSpacing(0)
+        page.addWidget(self.stack, 1)
+        page.addWidget(self.footer)
+        layout.addLayout(page, 1)
 
         self.title_bar = TitleBar()
         self.title_bar.minimize_requested.connect(self.showMinimized)

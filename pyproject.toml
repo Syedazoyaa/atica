@@ -69,7 +69,6 @@ packages = ["src/atica"]
 
 [tool.hatch.build.targets.sdist]
 include = ["src/atica", "tests", "docs", "examples", "README.md", "LICENSE", "CHANGELOG.md", "THIRD_PARTY_NOTICES.md"]
-exclude = ["docs/screenshots"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

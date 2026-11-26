@@ -38,7 +38,7 @@ class TitleBar(QWidget):
         mark.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         layout.addWidget(mark)
 
-        title = QLabel("ATICA - Manufacturing Calculations")
+        title = QLabel(branding.PRODUCT_NAME)
         title.setObjectName("titleBarTitle")
         title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         layout.addWidget(title)

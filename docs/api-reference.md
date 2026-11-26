@@ -996,7 +996,10 @@ Fields: `row_number`, `message`, `code`, `hint`
 ### `bom_from_rows(rows: 'Sequence[Mapping[str, Any]]', *, product_id: 'str' = '', allow_duplicates: 'bool' = False, row_numbers: 'Optional[Sequence[int]]' = None) -> 'Bom'`
 
 Build a :class:`~atica.materials.Bom` from rows with ``material_id, quantity_per_unit, unit``
-(optional ``wastage_percent`` and ``name``).  Any invalid row raises with its row number.
+(optional ``wastage_percent`` and ``name``).
+
+Nothing is returned unless every row is valid.  Otherwise one :class:`IntegrationError` reports **all**
+invalid rows and columns (also available as ``error.errors``, a tuple of :class:`RowError`).
 
 ### `convert_rows(rows: 'Sequence[Mapping[str, Any]]', *, value_column: 'str' = 'value', from_column: 'str' = 'from_unit', to_column: 'str' = 'to_unit', rounding: 'Any' = <Rounding.NONE: 'none'>, places: 'int' = 0, registry: 'Optional[UnitRegistry]' = None, row_numbers: 'Optional[Sequence[int]]' = None) -> 'ConversionReport'`
 

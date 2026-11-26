@@ -73,6 +73,7 @@ class PackagingView(ToolView):
             state,
             tool="Packaging",
             description="Full packages, the leftover, and the minimum whole packages needed to hold everything.",
+            depends_on=lambda: state.product,
         )
         self.plan = CalculatorPanel(
             "Packaging plan",
@@ -84,6 +85,7 @@ class PackagingView(ToolView):
             state,
             tool="Packaging",
             description="Splits a quantity into whole packages at every level, largest first, plus the loose remainder.",
+            depends_on=lambda: state.product,
         )
         self.add_tab("Breakdown", self.breakdown)
         self.add_tab("Packaging plan", self.plan)

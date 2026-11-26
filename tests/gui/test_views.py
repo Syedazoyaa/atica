@@ -55,9 +55,9 @@ class TestWindowStructure:
         from atica.version import __version__
 
         assert atica.__version__ == __version__
-        assert window.windowTitle() == "ATICA - Manufacturing Calculations"
+        assert window.windowTitle() == "ATICA"
         title = window.title_bar.findChild(QLabel, "titleBarTitle")
-        assert title is not None and title.text() == "ATICA - Manufacturing Calculations"
+        assert title is not None and title.text() == "ATICA"
 
     def test_dashboard_has_no_fabricated_activity(self, window):
         assert window.state.activity == []

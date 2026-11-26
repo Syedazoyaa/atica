@@ -9,6 +9,8 @@ from typing import Callable, Optional, TypeVar
 
 from atica.core import AticaError
 
+from .messages import plain_hint
+
 LOG = logging.getLogger("atica.gui")
 T = TypeVar("T")
 
@@ -22,12 +24,15 @@ class FriendlyError:
     hint: Optional[str] = None
     parameter: Optional[str] = None  # form field to highlight
     unexpected: bool = False
+    code: str = ""  # the library's stable error code
 
 
 def describe(exc: BaseException) -> FriendlyError:
     """Translate any exception into something understandable (and log the unexpected ones)."""
     if isinstance(exc, AticaError):
-        return FriendlyError("Please check your input", exc.message, exc.hint, exc.parameter)
+        return FriendlyError(
+            "Please check your input", exc.message, plain_hint(exc.hint), exc.parameter, code=exc.code
+        )
     LOG.error("Unexpected error in the GUI", exc_info=exc)
     return FriendlyError(
         "Something went wrong",

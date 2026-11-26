@@ -107,7 +107,7 @@ def percentage(value: Any, name: str, *, allow_100: bool = True, default: Option
         raise InvalidPercentageError(
             "%s must be between 0 and %s percent (got %s)." % (name, upper, _show(p)),
             parameter=name,
-            hint="Percentages use the 0-100 scale: write 5 for 5%%, not 0.05.",
+            hint="Percentages use the 0-100 scale: write 5 for 5%, not 0.05.",
         )
     return p
 

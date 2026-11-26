@@ -131,6 +131,7 @@ class QualityView(ToolView):
             state,
             tool="Quality",
             description="Expected good and scrapped units when part of the failures are reworked.",
+            error_aliases={"good_output": "good_target"},
         )
         self.wastage = CalculatorPanel(
             "Material wastage",

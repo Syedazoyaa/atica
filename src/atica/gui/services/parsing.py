@@ -11,6 +11,31 @@ from atica.core import AticaError, MissingInputError
 from atica.materials import Bom, BomItem
 from atica.packaging import PackagingLevel, Product
 
+from ..utils.messages import enter_number, translate
+
+#: library argument -> (column of the BOM editor, its heading)
+_BOM_COLUMNS = {
+    "material_id": (0, "Material"),
+    "quantity_per_unit": (1, "Qty per unit"),
+    "unit": (2, "Unit"),
+    "wastage_percent": (3, "Wastage %"),
+}
+
+
+def _bom_message(exc: AticaError, cells: Sequence[str]) -> str:
+    column = _BOM_COLUMNS.get(exc.parameter or "")
+    if column is None:
+        return exc.message
+    index, heading = column
+    numeric = exc.parameter in ("quantity_per_unit", "wastage_percent")
+    if numeric and (not cells[index] or "is not a valid number" in exc.message):
+        return enter_number(heading, blank=not cells[index])
+    if not cells[index]:
+        return "Fill in %s." % heading
+    return translate(
+        exc.message, {k: h for k, (_i, h) in _BOM_COLUMNS.items() if "_" in k or k == exc.parameter}
+    )[0]
+
 
 def build_product(product_id: str, name: str, rows: Sequence[Sequence[str]]) -> Product:
     """``rows`` are ``[level name, contains]`` from the smallest level up; the first row is the base level."""
@@ -33,6 +58,8 @@ def build_product(product_id: str, name: str, rows: Sequence[Sequence[str]]) -> 
                     )
                 levels.append(PackagingLevel(level_name, count, previous))
         except AticaError as exc:
+            if "is not a valid number" in exc.message:
+                exc.message = enter_number("Contains", blank=False)
             exc.message = "Row %d: %s" % (index, exc.message)
             raise
         previous = level_name
@@ -58,7 +85,7 @@ def build_bom(rows: Sequence[Sequence[str]], *, allow_duplicates: bool = False) 
         try:
             items.append(BomItem(cells[0], cells[1], cells[2], cells[3] or "0", cells[4]))
         except AticaError as exc:
-            exc.message = "BOM row %d: %s" % (index, exc.message)
+            exc.message = "BOM row %d: %s" % (index, _bom_message(exc, cells))
             raise
     if not items:
         raise MissingInputError(

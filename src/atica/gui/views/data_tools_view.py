@@ -26,6 +26,7 @@ from ..controllers import data_tools
 from ..services import AppState, suggest_filename, with_extension
 from ..utils.errors import guard
 from ..utils.icons import icon
+from ..utils.messages import plain_hint
 from .base import ToolView
 
 _EXCEL = importlib.util.find_spec("openpyxl") is not None
@@ -66,6 +67,7 @@ class DataToolsView(ToolView):
         choose.setIcon(icon("folder", size=16))
         choose.clicked.connect(self._choose_convert)
         self._form = FormPanel(rounding_fields(), self.state)
+        self._form.edited.connect(lambda _key: self.clear_report())
         self._convert_button = QPushButton("Convert file")
         self._convert_button.setObjectName("primary")
         self._convert_button.setEnabled(False)
@@ -110,7 +112,18 @@ class DataToolsView(ToolView):
         if path:
             self.set_file(path)
 
+    def clear_report(self) -> None:
+        """Forget the previous conversion: it no longer describes the chosen file and options."""
+        self._report = None
+        self._banner.hide()
+        self._ok_banner.hide()
+        self._table.setRowCount(0)
+        self._table.setColumnCount(0)
+        for button in (self._export_results, self._export_errors):
+            button.setEnabled(False)
+
     def set_file(self, path: str) -> None:
+        self.clear_report()
         self._path = path
         self._file_label.setText(path)
         self._convert_button.setEnabled(True)
@@ -154,7 +167,11 @@ class DataToolsView(ToolView):
         for err in report.errors:
             self._table.setItem(r, 0, QTableWidgetItem(str(err.row_number)))
             self._table.setItem(
-                r, 1, QTableWidgetItem("Problem: " + err.message + (" " + err.hint if err.hint else ""))
+                r,
+                1,
+                QTableWidgetItem(
+                    "Problem: " + err.message + (" " + plain_hint(err.hint) if err.hint else "")
+                ),
             )
             r += 1
         summary = "%d of %d row(s) converted" % (report.succeeded, report.total_rows)

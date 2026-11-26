@@ -96,7 +96,7 @@ LIGHT = Theme(
 #: Falcon Informatics brand colours (from its logo) for the two words of the copyright line.
 FALCON_BLUE = "#2C75B6"
 FALCON_GOLD = "#B88A00"
-FALCON_BROWN = "#3B1F0F"
+FALCON_BROWN = "#2A1306"  # dark chocolate: the company name in the sidebar
 
 #: The theme used by Python-side painting (icons, backdrops); the stylesheet gets its own argument.
 CURRENT = LIGHT
@@ -154,6 +154,10 @@ QPushButton#navButton:checked {{
 QPushButton#navButton:focus {{ outline: none; border: 2px solid {ink}; }}
 QPushButton#navButton[compact="true"] {{ text-align: center; padding: 10px 0; }}
 QPushButton#navButton[short="true"] {{ padding-top: 4px; padding-bottom: 4px; }}
+
+QLabel#appFooter {{
+    background: {layer}; color: {ink_secondary}; border-top: 1px solid {border}; font-size: 12px; padding: 4px 8px;
+}}
 
 /* ---------- typography ---------- */
 QWidget#pageHeader {{ background: transparent; min-height: 30px; max-height: 30px; }}
