@@ -8,8 +8,6 @@ from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QStyle, QToolButton, QWidget
 
-from atica.version import __version__
-
 from .. import branding
 
 
@@ -40,7 +38,7 @@ class TitleBar(QWidget):
         mark.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         layout.addWidget(mark)
 
-        title = QLabel("ATICA " + __version__)
+        title = QLabel("ATICA - Manufacturing Calculations")
         title.setObjectName("titleBarTitle")
         title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         layout.addWidget(title)

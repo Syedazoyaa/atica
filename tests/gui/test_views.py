@@ -50,9 +50,13 @@ class TestWindowStructure:
 
     def test_version_is_the_single_package_version(self, window):
         import atica
+        from PySide6.QtWidgets import QLabel
         from atica.version import __version__
 
-        assert atica.__version__ == __version__ and __version__ in window.windowTitle()
+        assert atica.__version__ == __version__
+        assert window.windowTitle() == "ATICA - Manufacturing Calculations"
+        title = window.title_bar.findChild(QLabel, "titleBarTitle")
+        assert title is not None and title.text() == "ATICA - Manufacturing Calculations"
 
     def test_dashboard_has_no_fabricated_activity(self, window):
         assert window.state.activity == []

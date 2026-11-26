@@ -8,7 +8,6 @@ from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt
 from PySide6.QtGui import QAction, QKeySequence, QMouseEvent
 from PySide6.QtWidgets import QApplication, QHBoxLayout, QMainWindow, QStackedWidget, QVBoxLayout, QWidget
 
-from atica.version import __version__
 
 from .components import Sidebar, TitleBar
 from .services import AppState
@@ -89,7 +88,7 @@ class MainWindow(QMainWindow):
     def __init__(self, state: Optional[AppState] = None) -> None:
         super().__init__()
         self.state = state or AppState()
-        self.setWindowTitle("ATICA " + __version__)
+        self.setWindowTitle("ATICA - Manufacturing Calculations")
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
         # Sized from the screen, not fixed: a 1366 x 768 laptop at 150 % scaling offers only ~910 x 510
         # logical pixels, so the minimum must stay small and the layout must adapt (see resizeEvent).

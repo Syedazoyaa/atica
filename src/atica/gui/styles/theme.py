@@ -96,7 +96,7 @@ LIGHT = Theme(
 #: Falcon Informatics brand colours (from its logo) for the two words of the copyright line.
 FALCON_BLUE = "#2C75B6"
 FALCON_GOLD = "#B88A00"
-FALCON_BROWN = "#8B4513"
+FALCON_BROWN = "#3B1F0F"
 
 #: The theme used by Python-side painting (icons, backdrops); the stylesheet gets its own argument.
 CURRENT = LIGHT
